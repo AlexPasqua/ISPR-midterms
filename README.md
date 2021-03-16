@@ -1,5 +1,5 @@
 # ISPR Assignments
-### Assignments for the course of Intelligent Systems for Pattern Recognition @ University of Pisa
+***Assignments for the course of Intelligent Systems for Pattern Recognition @ University of Pisa***
 
 ## Midterm 1 - Assignment 1 (March 2021)
 ### Autoregressive model
