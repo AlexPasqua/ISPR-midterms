@@ -1,4 +1,6 @@
 import pandas as pd
+from pandas.plotting import autocorrelation_plot
+import matplotlib.pyplot as plt
 import datetime
 
 
@@ -12,6 +14,11 @@ def read_data():
     # select training data
     first_day = whole_data["date"][0]
     last_day = first_day + datetime.timedelta(weeks=13)
-    tr_data = whole_data.loc[(whole_data["date"] >= first_day) & (whole_data["date"] <= last_day)]["Appliances"]
+    tr_data = whole_data[(whole_data["date"] >= first_day) & (whole_data["date"] <= last_day)]["Appliances"]
+    test_data = whole_data[whole_data["date"] > last_day]["Appliances"]
+    whole_data = whole_data["Appliances"]
 
-    return whole_data.to_numpy(), tr_data.to_numpy()
+    # autocorrelation_plot(tr_data)
+    # plt.show()
+
+    return whole_data.to_list(), tr_data.to_list(), test_data.to_list()

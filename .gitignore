@@ -1,4 +1,5 @@
+*.asv
 venv/
 .idea/
 midterm1/MSRC_ObjCategImageDatabase_v1/
-*.asv
+midterm1/__pycache__/
