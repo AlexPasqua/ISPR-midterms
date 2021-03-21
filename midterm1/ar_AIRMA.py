@@ -16,22 +16,29 @@ if __name__ == '__main__':
     order = 4
     model = ARIMA(endog=tr_data, order=(order, 0, 0))
     res = model.fit()
-    # print(res.summary())
+    print(res.summary())
     # print(res.polynomial_ar)
 
+
+    retrain = True
+    count_no_retrain = 1
     n_ts_samples = len(ts_data)
-    predictions = [res.forecast(steps=1)]
-    prev_err = err = abs(predictions[-1] - ts_data[0])
-    for i in range(n_ts_samples - 1):
+    predictions = []
+    err = last_retrain_idx = 0
+    for i in range(n_ts_samples):
         tr_data.append(ts_data[i])
-        # ts_data.remove(ts_data[i])
-        if i % 20 == 0:  # prev_err > 65:
+        predictions.append(res.forecast(steps=count_no_retrain)[-1])
+        prev_err = abs(ts_data[i] - predictions[-1])
+        err += prev_err
+        if retrain and prev_err > 200:
             print(i)
+            count_no_retrain = 1
+            # tr_data.append(ts_data[last_retrain_idx: i + 1])
+            last_retrain_idx = i
             model = ARIMA(endog=tr_data, order=(order, 0, 0))
             res = model.fit()
-        predictions.append(res.forecast(steps=1))
-        prev_err = abs(ts_data[i + 1] - predictions[-1])
-        err += prev_err
+        else:
+            count_no_retrain += 1
 
     err /= n_ts_samples
     print(err)
