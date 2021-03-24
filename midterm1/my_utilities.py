@@ -29,10 +29,25 @@ def read_data():
     return whole_data.to_numpy(), tr_data.to_numpy(), test_data.to_numpy()
 
 
-def train_models_parallel(ar_order, ma_order, arma_ar_order, arma_ma_order, tr_data, ts_data, err_thresh):
+def compute_err(actual, predictions):
+    mae = np.mean(np.abs(np.subtract(predictions, actual)))
+    mape = np.mean(np.abs(np.divide(np.subtract(actual, predictions), actual)))
+    return mae, mape
+
+
+def plot_curves(actual, predictions, title):
+    plt.plot(actual, label="Test data")
+    plt.plot(predictions, label="Predictions")
+    plt.title(title)
+    plt.legend()
+    plt.show()
+
+
+def train_models_parallel(ar_order, ma_order, arma_ar_order, arma_ma_order, tr_data, ts_data, err_thresh: list = None):
     ret_dict = Manager().dict()
-    p_ar = Process(target=train_ar, args=(ar_order, copy.deepcopy(tr_data), ts_data, err_thresh, ret_dict))
-    p_arma = Process(target=train_arma, args=(arma_ar_order, arma_ma_order, copy.deepcopy(tr_data), ts_data, err_thresh, ret_dict))
+    p_ar = Process(target=train_ar, args=(ar_order, copy.deepcopy(tr_data), ts_data, ret_dict, err_thresh))
+    p_arma = Process(target=train_arma,
+                     args=(arma_ar_order, arma_ma_order, copy.deepcopy(tr_data), ts_data, ret_dict, err_thresh))
     p_ar.start()
     p_arma.start()
     p_ar.join()
@@ -40,7 +55,7 @@ def train_models_parallel(ar_order, ma_order, arma_ar_order, arma_ma_order, tr_d
     return ret_dict
 
 
-def train_ar(order, tr_data, ts_data, err_thresh, ret_dict):
+def train_ar(order, tr_data, ts_data, ret_dict, err_thresh: list = None):
     predictions = []
     for i in tqdm(range(24 * 6)):
         ar = ARIMA(endog=tr_data, order=(order, 0, 0))
@@ -49,20 +64,12 @@ def train_ar(order, tr_data, ts_data, err_thresh, ret_dict):
         # curr_err = abs(predictions[-1] - ts_data[i])
         tr_data = np.concatenate((tr_data, [ts_data[i]]))
 
-    mee = np.mean(np.abs(np.subtract(predictions, ts_data[:24 * 6])))
-    mape = np.mean(np.abs(np.divide(
-        np.subtract(ts_data[:24 * 6], predictions),
-        ts_data[:24 * 6]
-    )))
-    ret_dict["ar"] = {"mee": mee, "mape": mape}
-    plt.plot(ts_data[:24 * 6], label="Test data")
-    plt.plot(predictions, label="Predictions")
-    plt.title(f"AR model (order: {order})")
-    plt.legend()
-    plt.show()
+    mae, mape = compute_err(ts_data[:24 * 6], predictions)
+    ret_dict["ar"] = {"mae": mae, "mape": mape}
+    plot_curves(ts_data[:24 * 6], predictions, f"AR model (order: {order})")
 
 
-def train_arma(ar_order, ma_order, tr_data, ts_data, err_thresh, ret_dict):
+def train_arma(ar_order, ma_order, tr_data, ts_data, ret_dict, err_thresh: list = None):
     predictions = []
     for i in tqdm(range(24 * 6)):
         arma = ARIMA(endog=tr_data, order=(ar_order, 0, ma_order))
@@ -71,17 +78,9 @@ def train_arma(ar_order, ma_order, tr_data, ts_data, err_thresh, ret_dict):
         # curr_err = abs(predictions[-1] - ts_data[i])
         tr_data = np.concatenate((tr_data, [ts_data[i]]))
 
-    mee = np.mean(np.abs(np.subtract(predictions, ts_data[:24 * 6])))
-    mape = np.mean(np.abs(np.divide(
-        np.subtract(ts_data[:24 * 6], predictions),
-        ts_data[:24 * 6]
-    )))
-    ret_dict["arma"] = {"mee": mee, "mape": mape}
-    plt.plot(ts_data[:24 * 6], label="Test data")
-    plt.plot(predictions, label="Predictions")
-    plt.title(f"ARMA model (AR order: {ar_order} - MA order: {ma_order})")
-    plt.legend()
-    plt.show()
+    mae, mape = compute_err(ts_data[:24 * 6], predictions)
+    ret_dict["arma"] = {"mae": mae, "mape": mape}
+    plot_curves(ts_data[:24 * 6], predictions, f"ARMA model (AR order: {ar_order} - MA order: {ma_order})")
 
 
 if __name__ == '__main__':
