@@ -31,8 +31,8 @@ def read_data():
 
 def compute_err(actual, predictions):
     mae = np.mean(np.abs(np.subtract(predictions, actual)))
-    mape = np.mean(np.abs(np.divide(np.subtract(actual, predictions), actual)))
-    return mae, mape
+    # mape = np.mean(np.abs(np.divide(np.subtract(actual, predictions), actual)))
+    return mae
 
 
 def plot_curves(actual, predictions, title):
@@ -43,55 +43,98 @@ def plot_curves(actual, predictions, title):
     plt.show()
 
 
-def train_models_parallel(ar_order, ma_order, arma_ar_order, arma_ma_order, tr_data, ts_data, err_thresh: list = None):
+def autolabel(rects):
+    """Attach a text label above each bar in *rects*, displaying its height."""
+    for rect in rects:
+        height = rect.get_height()
+        ax.annotate('{}'.format(height),
+                    xy=(rect.get_x() + rect.get_width() / 2, height),
+                    xytext=(0, 3),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom')
+
+
+def train_models_parallel(ar_order, arma_ar_order, arma_ma_order, tr_data, ts_data, err_threshes):
     ret_dict = Manager().dict()
-    p_ar = Process(target=train_ar, args=(ar_order, copy.deepcopy(tr_data), ts_data, ret_dict, err_thresh))
-    p_arma = Process(target=train_arma,
-                     args=(arma_ar_order, arma_ma_order, copy.deepcopy(tr_data), ts_data, ret_dict, err_thresh))
-    p_ar.start()
-    p_arma.start()
-    p_ar.join()
-    p_arma.join()
+    procs = []
+    idx = 0
+    for i in range(len(err_threshes) * 2):
+        idx = idx + 1 if i // (idx + 1) >= 2 else idx
+        err_thresh = err_threshes[idx]
+        if i % 2 == 0:
+            procs.append(Process(target=train_ar, args=(ar_order, copy.deepcopy(tr_data), ts_data, ret_dict, err_thresh)))
+        else:
+            procs.append(Process(target=train_arma, args=(arma_ar_order, arma_ma_order, copy.deepcopy(tr_data), ts_data,
+                                                          ret_dict, err_thresh)))
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.join()
     return ret_dict
 
 
-def train_ar(order, tr_data, ts_data, ret_dict, err_thresh: list = None):
+def train_ar(order, tr_data, ts_data, ret_dict, err_thresh):
     predictions = []
-    for i in tqdm(range(24 * 6)):
-        ar = ARIMA(endog=tr_data, order=(order, 0, 0))
-        res_ar = ar.fit()
+    for i in tqdm(range(len(ts_data))):
+        if i == 0:
+            ar = ARIMA(endog=tr_data, order=(order, 0, 0))
+            res_ar = ar.fit()
         predictions.append(res_ar.forecast(steps=1))
         # curr_err = abs(predictions[-1] - ts_data[i])
         tr_data = np.concatenate((tr_data, [ts_data[i]]))
 
-    mae, mape = compute_err(ts_data[:24 * 6], predictions)
-    ret_dict["ar"] = {"mae": mae, "mape": mape}
-    plot_curves(ts_data[:24 * 6], predictions, f"AR model (order: {order})")
+    mae = compute_err(ts_data, predictions)
+    ret_dict["ar_" + str(err_thresh)] = mae
+    # ret_dict["ar_thr_" + str(err_thresh)] = {"mae": mae, "mape": mape}
+    plot_curves(ts_data[:48 * 6], predictions[:48 * 6], f"AR model (order: {order})")
 
 
-def train_arma(ar_order, ma_order, tr_data, ts_data, ret_dict, err_thresh: list = None):
+def train_arma(ar_order, ma_order, tr_data, ts_data, ret_dict, err_thresh):
     predictions = []
-    for i in tqdm(range(24 * 6)):
-        arma = ARIMA(endog=tr_data, order=(ar_order, 0, ma_order))
-        res_ar = arma.fit()
+    for i in tqdm(range(len(ts_data))):
+        if i == 0:
+            arma = ARIMA(endog=tr_data, order=(ar_order, 0, ma_order))
+            res_ar = arma.fit()
         predictions.append(res_ar.forecast(steps=1))
         # curr_err = abs(predictions[-1] - ts_data[i])
         tr_data = np.concatenate((tr_data, [ts_data[i]]))
 
-    mae, mape = compute_err(ts_data[:24 * 6], predictions)
-    ret_dict["arma"] = {"mae": mae, "mape": mape}
-    plot_curves(ts_data[:24 * 6], predictions, f"ARMA model (AR order: {ar_order} - MA order: {ma_order})")
+    mae = compute_err(ts_data, predictions)
+    ret_dict["arma_" + str(err_thresh)] = mae
+    # ret_dict["arma_thr_" + str(err_thresh)] = {"mae": mae, "mape": mape}
+    plot_curves(ts_data[:48 * 6], predictions[:48 * 6], f"ARMA model (AR order: {ar_order} - MA order: {ma_order})")
 
 
 if __name__ == '__main__':
     ar_order = 3
-    ma_order = 4
     arma_ar_order = 3
     arma_ma_order = 1
+    err_threses = [100, 200, 50]
     _, tr_data, ts_data = read_data()
-    metrics = train_models_parallel(ar_order, ma_order, arma_ar_order, arma_ma_order, tr_data[:500], ts_data)
+    metrics = train_models_parallel(ar_order, arma_ar_order, arma_ma_order, tr_data, ts_data, err_threses)
+
+    # print error values
     for k, v in metrics.items():
-        print(f"{k}:")
-        for kk, vv in metrics[k].items():
-            print(f"{kk}: {vv}")
-        print()
+        print(f"{k}: {v}")
+
+    # plot histogram
+    labels = [f"AR({ar_order})", f"ARMA({arma_ar_order}, {arma_ma_order})"]
+    series1 = [round(metrics["ar_" + str(err_threses[0])]), round(metrics["arma_" + str(err_threses[0])])]
+    series2 = [round(metrics["ar_" + str(err_threses[1])]), round(metrics["arma_" + str(err_threses[1])])]
+    series3 = [round(metrics["ar_" + str(err_threses[2])]), round(metrics["arma_" + str(err_threses[2])])]
+    x = np.arange(len(labels))
+    bars_width = 0.2
+    fig, ax = plt.subplots()
+    r1 = ax.bar(x - bars_width, series1, bars_width, label="Error threshold: " + str(err_threses[0]))
+    r2 = ax.bar(x, series2, bars_width, label="Error threshold: " + str(err_threses[1]))
+    r3 = ax.bar(x + bars_width, series3, bars_width, label="Error threshold: " + str(err_threses[2]))
+    ax.set_ylabel("MAE")
+    ax.set_title("Mean Absolute Error")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
+    autolabel(r1)
+    autolabel(r2)
+    autolabel(r3)
+    fig.tight_layout()
+    plt.show()
