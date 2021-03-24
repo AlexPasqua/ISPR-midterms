@@ -78,7 +78,7 @@ def train_ar(order, tr_data, ts_data, ret_dict, err_thresh):
     last_retrain_idx = 0
     count_no_retrain = 1
     err = 1000000
-    for i in tqdm(range(len(ts_data))):
+    for i in range(len(ts_data)):
         if i == 0 or err > err_thresh:
             last_retrain_idx = i
             count_no_retrain = 0
@@ -123,9 +123,9 @@ if __name__ == '__main__':
     ar_order = 3
     arma_ar_order = 3
     arma_ma_order = 1
-    err_threses = [10, 50, 100]
+    err_threses = [50, 100, 200]
     _, tr_data, ts_data = read_data()
-    metrics = train_models_parallel(ar_order, arma_ar_order, arma_ma_order, tr_data, ts_data[:500], err_threses)
+    metrics = train_models_parallel(ar_order, arma_ar_order, arma_ma_order, tr_data, ts_data, err_threses)
 
     # print error values
     for k, v in metrics.items():
