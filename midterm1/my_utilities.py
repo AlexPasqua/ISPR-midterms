@@ -75,43 +75,57 @@ def train_models_parallel(ar_order, arma_ar_order, arma_ma_order, tr_data, ts_da
 
 def train_ar(order, tr_data, ts_data, ret_dict, err_thresh):
     predictions = []
+    last_retrain_idx = 0
+    count_no_retrain = 1
+    err = 1000000
     for i in tqdm(range(len(ts_data))):
-        if i == 0:
+        if i == 0 or err > err_thresh:
+            last_retrain_idx = i
+            count_no_retrain = 0
+            tr_data = np.concatenate((tr_data, ts_data[last_retrain_idx: i]))
             ar = ARIMA(endog=tr_data, order=(order, 0, 0))
             res_ar = ar.fit()
-        predictions.append(res_ar.forecast(steps=1))
-        # curr_err = abs(predictions[-1] - ts_data[i])
-        tr_data = np.concatenate((tr_data, [ts_data[i]]))
+        count_no_retrain += 1
+        predictions.append(res_ar.forecast(steps=count_no_retrain)[-1])
+        err = abs(predictions[-1] - ts_data[i])
+        # tr_data = np.concatenate((tr_data, [ts_data[i]]))
 
     mae = compute_err(ts_data, predictions)
     ret_dict["ar_" + str(err_thresh)] = mae
-    # ret_dict["ar_thr_" + str(err_thresh)] = {"mae": mae, "mape": mape}
-    plot_curves(ts_data[:48 * 6], predictions[:48 * 6], f"AR model (order: {order})")
+    # plot the last 2 days
+    plot_curves(ts_data[-(48 * 6):], predictions[-(48 * 6):], f"AR model (order: {order})")
 
 
 def train_arma(ar_order, ma_order, tr_data, ts_data, ret_dict, err_thresh):
     predictions = []
+    last_retrain_idx = 0
+    count_no_retrain = 1
+    err = 1000000
     for i in tqdm(range(len(ts_data))):
-        if i == 0:
+        if i == 0 or err > err_thresh:
+            last_retrain_idx = i
+            count_no_retrain = 0
+            tr_data = np.concatenate((tr_data, ts_data[last_retrain_idx: i]))
             arma = ARIMA(endog=tr_data, order=(ar_order, 0, ma_order))
             res_ar = arma.fit()
-        predictions.append(res_ar.forecast(steps=1))
-        # curr_err = abs(predictions[-1] - ts_data[i])
-        tr_data = np.concatenate((tr_data, [ts_data[i]]))
+        count_no_retrain += 1
+        predictions.append(res_ar.forecast(steps=count_no_retrain)[-1])
+        err = abs(predictions[-1] - ts_data[i])
+        # tr_data = np.concatenate((tr_data, [ts_data[i]]))
 
     mae = compute_err(ts_data, predictions)
     ret_dict["arma_" + str(err_thresh)] = mae
-    # ret_dict["arma_thr_" + str(err_thresh)] = {"mae": mae, "mape": mape}
-    plot_curves(ts_data[:48 * 6], predictions[:48 * 6], f"ARMA model (AR order: {ar_order} - MA order: {ma_order})")
+    # plot the last 2 days
+    plot_curves(ts_data[-(48 * 6):], predictions[-(48 * 6):], f"ARMA model (AR order: {ar_order} - MA order: {ma_order})")
 
 
 if __name__ == '__main__':
     ar_order = 3
     arma_ar_order = 3
     arma_ma_order = 1
-    err_threses = [100, 200, 50]
+    err_threses = [10, 50, 100]
     _, tr_data, ts_data = read_data()
-    metrics = train_models_parallel(ar_order, arma_ar_order, arma_ma_order, tr_data, ts_data, err_threses)
+    metrics = train_models_parallel(ar_order, arma_ar_order, arma_ma_order, tr_data, ts_data[:500], err_threses)
 
     # print error values
     for k, v in metrics.items():
