@@ -30,31 +30,16 @@ def train(order_ar, order_ma, tr_data, ts_data, retrain, err_thresh):
     # compute mean absolute error (MAE)
     mae = np.mean(np.abs(np.subtract(ts_data, predictions)))
     out = {'mae': mae, 'predictions': predictions}
-    filename = str(order_ar) + "_" + str(order_ma) + "_" + str(err_thresh) + "_retrain" if retrain else ""
+    filename = str(order_ar) + "_" + str(order_ma) + "_" + str(err_thresh) + "_retrain" if retrain else "" + ".json"
     with open(filename, 'w') as outf:
         json.dump(out, outf, indent='\t')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--order_ar',
-        action='store',
-        type=int,
-        help="The AR order"
-    )
-    parser.add_argument(
-        '--order_ma',
-        action='store',
-        type=int,
-        help="The MA order"
-    )
-    parser.add_argument(
-        '--err_thresh',
-        action='store',
-        type=int,
-        help="Error threshold over which the model is retrained"
-    )
+    parser.add_argument('--order_ar', action='store', type=int, help="The AR order")
+    parser.add_argument('--order_ma', action='store', type=int, help="The MA order")
+    parser.add_argument('--err_thresh', action='store', type=int, help="Error threshold over which the model is retrained")
     parser.add_argument('--retrain', action='store_true', help="Whether or not to retrain during testing")
     args = parser.parse_args()
 
