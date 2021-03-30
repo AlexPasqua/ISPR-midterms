@@ -1,9 +1,11 @@
 import datetime
-import copy
+import json
+import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from multiprocessing import Process, Manager
+from os import listdir
+from os.path import isfile, join
 from statsmodels.tsa.arima.model import ARIMA
 from tqdm import tqdm
 
@@ -29,21 +31,7 @@ def read_data():
     return whole_data.to_numpy(), tr_data.to_numpy(), test_data.to_numpy()
 
 
-def compute_err(actual, predictions):
-    mae = np.mean(np.abs(np.subtract(predictions, actual)))
-    # mape = np.mean(np.abs(np.divide(np.subtract(actual, predictions), actual)))
-    return mae
-
-
-def plot_curves(actual, predictions, title):
-    plt.plot(actual, label="Test data")
-    plt.plot(predictions, label="Predictions")
-    plt.title(title)
-    plt.legend()
-    plt.show()
-
-
-def autolabel(rects):
+def autolabel(ax, rects):
     """Attach a text label above each bar in *rects*, displaying its height."""
     for rect in rects:
         height = rect.get_height()
@@ -54,101 +42,98 @@ def autolabel(rects):
                     ha='center', va='bottom')
 
 
-def train_models_parallel(ar_order, arma_ar_order, arma_ma_order, tr_data, ts_data, err_threshes):
-    ret_dict = Manager().dict()
-    procs = []
-    idx = 0
-    for i in range(len(err_threshes) * 2):
-        idx = idx + 1 if i // (idx + 1) >= 2 else idx
-        err_thresh = err_threshes[idx]
-        if i % 2 == 0:
-            procs.append(Process(target=train_ar, args=(ar_order, copy.deepcopy(tr_data), ts_data, ret_dict, err_thresh)))
-        else:
-            procs.append(Process(target=train_arma, args=(arma_ar_order, arma_ma_order, copy.deepcopy(tr_data), ts_data,
-                                                          ret_dict, err_thresh)))
-    for p in procs:
-        p.start()
-    for p in procs:
-        p.join()
-    return ret_dict
-
-
-def train_ar(order, tr_data, ts_data, ret_dict, err_thresh):
-    predictions = []
-    last_retrain_idx = 0
-    count_no_retrain = 1
-    err = 1000000
-    for i in range(len(ts_data)):
-        if i == 0 or err > err_thresh:
-            last_retrain_idx = i
-            count_no_retrain = 0
-            tr_data = np.concatenate((tr_data, ts_data[last_retrain_idx: i]))
-            ar = ARIMA(endog=tr_data, order=(order, 0, 0))
-            res_ar = ar.fit()
-        count_no_retrain += 1
-        predictions.append(res_ar.forecast(steps=count_no_retrain)[-1])
-        err = abs(predictions[-1] - ts_data[i])
-        # tr_data = np.concatenate((tr_data, [ts_data[i]]))
-
-    mae = compute_err(ts_data, predictions)
-    ret_dict["ar_" + str(err_thresh)] = mae
-    # plot the last 2 days
-    plot_curves(ts_data[-(48 * 6):], predictions[-(48 * 6):], f"AR model (order: {order})")
-
-
-def train_arma(ar_order, ma_order, tr_data, ts_data, ret_dict, err_thresh):
-    predictions = []
-    last_retrain_idx = 0
-    count_no_retrain = 1
-    err = 1000000
-    for i in tqdm(range(len(ts_data))):
-        if i == 0 or err > err_thresh:
-            last_retrain_idx = i
-            count_no_retrain = 0
-            tr_data = np.concatenate((tr_data, ts_data[last_retrain_idx: i]))
-            arma = ARIMA(endog=tr_data, order=(ar_order, 0, ma_order))
-            res_ar = arma.fit()
-        count_no_retrain += 1
-        predictions.append(res_ar.forecast(steps=count_no_retrain)[-1])
-        err = abs(predictions[-1] - ts_data[i])
-        # tr_data = np.concatenate((tr_data, [ts_data[i]]))
-
-    mae = compute_err(ts_data, predictions)
-    ret_dict["arma_" + str(err_thresh)] = mae
-    # plot the last 2 days
-    plot_curves(ts_data[-(48 * 6):], predictions[-(48 * 6):], f"ARMA model (AR order: {ar_order} - MA order: {ma_order})")
-
-
-if __name__ == '__main__':
-    ar_order = 3
-    arma_ar_order = 3
-    arma_ma_order = 1
-    err_threses = [50, 100, 200]
-    _, tr_data, ts_data = read_data()
-    metrics = train_models_parallel(ar_order, arma_ar_order, arma_ma_order, tr_data, ts_data, err_threses)
-
-    # print error values
-    for k, v in metrics.items():
-        print(f"{k}: {v}")
-
-    # plot histogram
-    labels = [f"AR({ar_order})", f"ARMA({arma_ar_order}, {arma_ma_order})"]
-    series1 = [round(metrics["ar_" + str(err_threses[0])]), round(metrics["arma_" + str(err_threses[0])])]
-    series2 = [round(metrics["ar_" + str(err_threses[1])]), round(metrics["arma_" + str(err_threses[1])])]
-    series3 = [round(metrics["ar_" + str(err_threses[2])]), round(metrics["arma_" + str(err_threses[2])])]
+def my_bar_plot(series, labels):
+    """
+    Plots the bar-plot of the MAE for each model, for each retraining schedule
+    :param series: list of series to plot (one for each model, one value for each retraining schedule (err_thresh))
+    :param labels: labels for the xtickslabels
+    """
+    series_list = list(series.values())
+    series0, series1, series2, series3 = series_list[0], series_list[1], series_list[2], series_list[3]
     x = np.arange(len(labels))
-    bars_width = 0.2
-    fig, ax = plt.subplots()
-    r1 = ax.bar(x - bars_width, series1, bars_width, label="Error threshold: " + str(err_threses[0]))
-    r2 = ax.bar(x, series2, bars_width, label="Error threshold: " + str(err_threses[1]))
-    r3 = ax.bar(x + bars_width, series3, bars_width, label="Error threshold: " + str(err_threses[2]))
+    bars_width = 0.22
+    fig, ax = plt.subplots(figsize=(10, 7))
+    r0 = ax.bar(x - 1.5 * bars_width, series0, bars_width, label="Error threshold: " + str(list(series.keys())[0]))
+    r1 = ax.bar(x - 0.5 * bars_width, series1, bars_width, label="Error threshold: " + str(list(series.keys())[1]))
+    r2 = ax.bar(x + 0.5 * bars_width, series2, bars_width, label="Error threshold: " + str(list(series.keys())[2]))
+    r3 = ax.bar(x + 1.5 * bars_width, series3, bars_width, label="Error threshold: " + str(list(series.keys())[3]))
     ax.set_ylabel("MAE")
     ax.set_title("Mean Absolute Error")
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     ax.legend()
-    autolabel(r1)
-    autolabel(r2)
-    autolabel(r3)
-    fig.tight_layout()
+    autolabel(ax, r0)
+    autolabel(ax, r1)
+    autolabel(ax, r2)
+    autolabel(ax, r3)
+    # fig.tight_layout()
     plt.show()
+
+
+def predict_and_retrain(order_ar, order_ma, tr_data, ts_data, retrain, err_thresh):
+    """
+    Perform a cycle of predicting and retraining
+    :param order_ar: order of the autoregressive part
+    :param order_ma: order of the moving average part
+    :param tr_data: training data -> got from function read_data()
+    :param ts_data: test data -> got from function read_data()
+    :param retrain: boolean, if False the model is never retrained
+    :param err_thresh: the error threshold over which a retraining is performed
+    """
+    # create and fit the model on the training set
+    model = ARIMA(endog=tr_data, order=(order_ar, 0, order_ma))
+    res = model.fit()
+
+    # start forecasting on the test set and retrain when needed
+    idx_last_retrain = 0
+    count_no_retrain = 1
+    predictions = []
+    for i in tqdm(range(len(ts_data))):
+        predictions.append(res.forecast(steps=count_no_retrain)[-1])
+        err = abs(ts_data[i] - predictions[-1])
+        if retrain and err > err_thresh:
+            idx_last_retrain = i
+            count_no_retrain = 1
+            tr_data = np.concatenate((tr_data, ts_data[idx_last_retrain: i + 1]))
+            model = ARIMA(endog=tr_data, order=(order_ar, 0, order_ma))
+            res = model.fit()
+        else:
+            count_no_retrain += 1
+
+    # compute mean absolute error (MAE)
+    mae = np.mean(np.abs(np.subtract(ts_data, predictions)))
+    out = {'mae': mae, 'predictions': predictions}
+    filename = str(order_ar) + "_" + str(order_ma) + "_" + str(err_thresh) + "_retrain" if retrain else "" + ".json"
+    with open(filename, 'w') as outf:
+        json.dump(out, outf, indent='\t')
+
+
+def join_files(path):
+    """
+    Function to take all the files of the results and create one single file with the results of every model
+    :param path: path of the directory where the results files are
+    """
+    results = []
+    filenames = [f for f in listdir(path) if isfile(join(path, f))]
+    for fn in filenames:
+        if fn[-5:] == ".json":
+            with open(fn, 'r') as f:
+                data = json.load(f)
+                data = {**{"model": fn[:-5]}, **data}
+                results.append(data)
+
+    with open("results/whole_results.json", 'w') as outf:
+        json.dump(results, outf, indent='\t')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--order_ar', action='store', type=int, help="The AR order")
+    parser.add_argument('--order_ma', action='store', type=int, help="The MA order")
+    parser.add_argument('--err_thresh', action='store', type=int, help="Error threshold over which the model is retrained")
+    parser.add_argument('--retrain', action='store_true', help="Whether or not to retrain during testing")
+    args = parser.parse_args()
+
+    _, tr_data, ts_data = read_data()
+    predict_and_retrain(order_ar=args.order_ar, order_ma=args.order_ma, tr_data=tr_data, ts_data=ts_data, retrain=args.retrain,
+                        err_thresh=args.err_thresh)

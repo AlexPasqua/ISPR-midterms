@@ -1,5 +1,5 @@
 *.asv
 venv/
 .idea/
-midterm1/MSRC_ObjCategImageDatabase_v1/
 midterm1/__pycache__/
+midterm1/.ipynb_checkpoints/
