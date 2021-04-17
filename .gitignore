@@ -3,3 +3,6 @@ venv/
 .idea/
 midterm1/__pycache__/
 midterm1/.ipynb_checkpoints/
+midterm2/__pycache__/
+midterm2/.ipynb_checkpoints/
+midterm2/MNIST/*
