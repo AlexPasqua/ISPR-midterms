@@ -3,7 +3,11 @@ from mlxtend.data import loadlocal_mnist
 
 
 def load_mnist(path=None):
-    """ Load the MNIST dataset """
+    """
+    Load the MNIST dataset
+    :param path: path to the directory containing the MNIST files
+    :return: training and test images and labels scaled between 0 and 1
+    """
     path = "MNIST/" if path is None else (path + '/' if path[-1] != '/' else path)
     train_images, train_labels = loadlocal_mnist(images_path=path + 'train-images-idx3-ubyte',
                                                  labels_path=path + 'train-labels-idx1-ubyte')
@@ -24,8 +28,8 @@ def sigmoid(x):
 
 
 if __name__ == '__main__':
-    train_images, train_labels, test_images, test_labels = load_mnist()
-    print('Dimensions: %s x %s' % (train_images.shape[0], train_images.shape[1]))
+    tr_imgs, tr_labels, ts_imgs, ts_labels = load_mnist()
+    print('Dimensions: %s x %s' % (tr_imgs.shape[0], tr_imgs.shape[1]))
 
     # img = np.reshape(train_images[0], newshape=(28, 28))
     # plt.imshow(img)
