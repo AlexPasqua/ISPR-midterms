@@ -1,3 +1,5 @@
+import pickle
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -17,6 +19,8 @@ class RBM:
         :param bias_hidden: bias vector for hidden layer
         """
         assert n_visible >= 0 and n_hidden >= 0
+        self.n_visible = n_visible
+        self.n_hidden = n_hidden
         weights_shape = (n_hidden, n_visible)
         self.W = W if W is not None else np.random.uniform(-1, 1, size=weights_shape)
         self.bias_visible = bias_visible if bias_visible is not None else np.zeros(n_visible)
@@ -38,7 +42,7 @@ class RBM:
 
     def gibbs_sampling(self, h_sample, k):
         """ Performs Gibbs sampling """
-        v_sample = None     # in case it doesn't enter the cycle, but it shouldn't happen
+        v_sample = None  # in case it doesn't enter the cycle, but it shouldn't happen
         for i in range(k):
             v_prob = sigmoid(np.add(np.matmul(h_sample, self.W), self.bias_visible))
             v_sample = np.random.binomial(n=1, p=v_prob, size=len(v_prob))
@@ -70,12 +74,47 @@ class RBM:
             for i in tqdm(range(len(train_labels))):
                 self.contrastive_divergence(v_prob=train_images[i], k=k, lr=lr)
 
+    def show_learnt_features(self):
+        # TODO: improve and finish this method
         # plot the weights to see learnt features
         # not sure if it's right
-        for i in range(10):
+        for i in range(3):
             fig, ax = plt.subplots(1, 2)
             img = np.reshape(self.W[i], newshape=(28, 28))
             ax[0].imshow(img)
             img = np.reshape(self.W[:][i], newshape=(28, 28))
             ax[1].imshow(img)
             fig.show()
+
+    def save_model(self, path):
+        """
+        Saves the model on a pickle file
+        :param path: the file where to save the model
+        """
+        path = path if (path.endswith('.pickle') or path.endswith('.pkl')) else path + '.pickle'
+        dump_dict = {'n_visible': self.n_visible,
+                     'n_hidden': self.n_hidden,
+                     'weights': self.W,
+                     'bias_visible': self.bias_visible,
+                     'bias_hidden': self.bias_hidden}
+        with open(path, 'wb') as f:
+            pickle.dump(dump_dict, f)
+
+    def load_weights(self, path):
+        """
+        Loads the model's weights (and biases) from a pickle file.
+        The model's architecture must be compatible with the weights being loaded.
+        :param path: the path to the json file where the weights are stored
+        :raises FileNotFoundError: if path does not correspond to an existing file
+        :raises AssertionError: if the shape of the weights and biases is not compatible with model's architecture
+        """
+        with open(path, 'rb') as f:
+            data = pickle.load(f)
+            weights = data['weights']
+            bias_visible = data['bias_visible']
+            bias_hidden = data['bias_hidden']
+            assert len(weights[0]) == len(bias_visible) == self.n_visible \
+                   and len(weights[:, 0]) == len(bias_hidden) == self.n_hidden
+            self.W = weights
+            self.bias_visible = bias_visible
+            self.bias_hidden = bias_hidden
