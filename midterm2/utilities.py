@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 from mlxtend.data import loadlocal_mnist
-from RBM import RBM
+from RBM import *
 
 
 def load_mnist(path=None):

@@ -3,6 +3,8 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from sklearn.neural_network import MLPClassifier
+from datetime import datetime
 from utilities import load_mnist, sigmoid
 
 
@@ -17,6 +19,7 @@ class RBM:
         :param W: weights matrix
         :param bias_visible: bias vector for visible layer
         :param bias_hidden: bias vector for hidden layer
+        :raises AssertionError: if there are incompatibilities between parameters
         """
         assert n_visible >= 0 and n_hidden >= 0
         self.n_visible = n_visible
@@ -27,6 +30,14 @@ class RBM:
         self.bias_hidden = bias_hidden if bias_hidden is not None else np.zeros(n_hidden)
         assert self.W.shape == weights_shape and n_visible == len(self.bias_visible) and n_hidden == len(
             self.bias_hidden)
+        self.classifier = MLPClassifier(
+            hidden_layer_sizes=(10, 10),
+            activation='relu',
+            solver='adam',
+            learning_rate_init=0.05,
+            max_iter=200,
+            verbose=True
+        )
 
     def ph_v(self, v_sample):
         """ Compute conditional probability of the hidden units given the visible ones """
@@ -62,7 +73,7 @@ class RBM:
         self.bias_visible += lr * np.subtract(v_sample, v_sample_gibbs)
         self.bias_hidden += lr * np.subtract(h_sample, h_sample_gibbs)
 
-    def fit(self, epochs, lr, k, mnist_path=None):
+    def fit(self, epochs, lr, k, mnist_path=None, save=True, save_path=None, fit_classifier=False):
         """ Perform model fitting """
         assert epochs >= 0 and lr > 0 and k > 0
         train_images, train_labels, test_images, test_labels = load_mnist(mnist_path)
@@ -73,6 +84,42 @@ class RBM:
         for ep in range(epochs):
             for i in tqdm(range(len(train_labels))):
                 self.contrastive_divergence(v_prob=train_images[i], k=k, lr=lr)
+
+        if save:
+            self.save_model(datetime.now().strftime("rbm_%d-%m-%y_%H-%M") if save_path is None else save_path)
+
+        if fit_classifier:
+            # TODO: fix body of if statement -> messy for now
+            self.fit_classifier(mnist_path=mnist_path)
+            self.test_classifier(mnist_path=mnist_path)
+            # ts_img = sigmoid(np.add(np.matmul(self.W, test_images[0]), self.bias_hidden))
+            # prediction = np.argmax(self.classifier.predict_proba(ts_img.reshape(1, -1)))
+            # print("Predicted: ", prediction)
+            # img = np.reshape(test_images[0], newshape=(28, 28))
+            # plt.imshow(img)
+            # plt.show()
+
+    def fit_classifier(self, load_rbm_weights=False, w_path=None, mnist_path=None, save=True, save_path=None):
+        if load_rbm_weights:
+            self.load_weights(w_path)
+        train_images, train_labels, _, _ = load_mnist(mnist_path)
+        tr_set = []
+        for i in range(len(train_labels)):
+            encoding = sigmoid(np.add(np.matmul(self.W, train_images[i]), self.bias_hidden))
+            tr_set.append(encoding)
+        self.classifier.fit(tr_set, train_labels)
+        if save:
+            save_path = datetime.now().strftime("classifier_%d-%m-%y_%H-%M") if save_path is None else save_path
+            with open(save_path, 'wb') as f:
+                pickle.dump(self.classifier, f)
+
+    def test_classifier(self, test_images=None, test_labels=None, mnist_path=None):
+        if test_images is None:
+            _, _, test_images, test_labels = load_mnist(mnist_path)
+        test_encodings = []
+        for i in range(len(test_labels)):
+            enc = sigmoid(np.add(np.matmul(self.W, test_images[0]), self.bias_hidden))
+            test_encodings.append(enc)
 
     def show_learnt_features(self):
         # TODO: improve and finish this method
