@@ -2,9 +2,11 @@ import pickle
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from tqdm import tqdm
-from sklearn.neural_network import MLPClassifier
+import tensorflow as tf
+from tensorflow.keras.layers import Dense
+from tensorflow.python.keras.utils.np_utils import to_categorical
 from datetime import datetime
+from tqdm import tqdm
 from utilities import load_mnist, sigmoid
 
 
@@ -30,14 +32,10 @@ class RBM:
         self.bias_hidden = bias_hidden if bias_hidden is not None else np.zeros(n_hidden)
         assert self.W.shape == weights_shape and n_visible == len(self.bias_visible) and n_hidden == len(
             self.bias_hidden)
-        self.classifier = MLPClassifier(
-            hidden_layer_sizes=(10, 10),
-            activation='relu',
-            solver='adam',
-            learning_rate_init=0.05,
-            max_iter=200,
-            verbose=True
-        )
+        self.classifier = tf.keras.models.Sequential([
+            Dense(units=50, activation='relu'),
+            Dense(units=10, activation='softmax')
+        ])
 
     def ph_v(self, v_sample):
         """ Compute conditional probability of the hidden units given the visible ones """
@@ -107,11 +105,24 @@ class RBM:
         for i in range(len(train_labels)):
             encoding = sigmoid(np.add(np.matmul(self.W, train_images[i]), self.bias_hidden))
             tr_set.append(encoding)
-        self.classifier.fit(tr_set, train_labels)
+
+        train_labels = tf.stack(to_categorical(train_labels, 10))
+        tr_set = tf.stack(tr_set)
+        self.classifier.compile(
+            optimizer='adam',
+            loss='categorical_crossentropy',
+            metrics='accuracy'
+        )
+        self.classifier.fit(
+            x=tr_set,
+            y=train_labels,
+            epochs=10,
+            use_multiprocessing=True,
+            workers=4
+        )
         if save:
             save_path = datetime.now().strftime("classifier_%d-%m-%y_%H-%M") if save_path is None else save_path
-            with open(save_path, 'wb') as f:
-                pickle.dump(self.classifier, f)
+            self.classifier.save(save_path)
 
     def test_classifier(self, test_images=None, test_labels=None, mnist_path=None):
         if test_images is None:
@@ -120,6 +131,15 @@ class RBM:
         for i in range(len(test_labels)):
             enc = sigmoid(np.add(np.matmul(self.W, test_images[0]), self.bias_hidden))
             test_encodings.append(enc)
+        test_encodings = tf.stack(test_encodings)
+        test_labels = tf.stack(to_categorical(test_labels))
+        res = self.classifier.evaluate(
+            x=test_encodings,
+            y=test_labels,
+            return_dict=True
+        )
+        for k, v in res.items():
+            print(f"{k}: {v}")
 
     def show_learnt_features(self):
         # TODO: improve and finish this method
