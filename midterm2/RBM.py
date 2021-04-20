@@ -33,7 +33,7 @@ class RBM:
         assert self.W.shape == weights_shape and n_visible == len(self.bias_visible) and n_hidden == len(
             self.bias_hidden)
         self.classifier = tf.keras.models.Sequential([
-            Dense(units=50, activation='relu'),
+            Dense(units=50, activation='relu', input_dim=n_hidden),
             Dense(units=10, activation='softmax')
         ])
 
@@ -104,6 +104,7 @@ class RBM:
         tr_set = []
         for i in range(len(train_labels)):
             encoding = sigmoid(np.add(np.matmul(self.W, train_images[i]), self.bias_hidden))
+            encoding = np.random.binomial(n=1, p=encoding, size=len(encoding))
             tr_set.append(encoding)
 
         train_labels = tf.stack(to_categorical(train_labels, 10))
@@ -116,7 +117,7 @@ class RBM:
         self.classifier.fit(
             x=tr_set,
             y=train_labels,
-            epochs=10,
+            epochs=5,
             use_multiprocessing=True,
             workers=4
         )
@@ -129,8 +130,9 @@ class RBM:
             _, _, test_images, test_labels = load_mnist(mnist_path)
         test_encodings = []
         for i in range(len(test_labels)):
-            enc = sigmoid(np.add(np.matmul(self.W, test_images[0]), self.bias_hidden))
-            test_encodings.append(enc)
+            encoding = sigmoid(np.add(np.matmul(self.W, test_images[0]), self.bias_hidden))
+            encoding = np.random.binomial(n=1, p=encoding, size=len(encoding))
+            test_encodings.append(encoding)
         test_encodings = tf.stack(test_encodings)
         test_labels = tf.stack(to_categorical(test_labels))
         res = self.classifier.evaluate(
