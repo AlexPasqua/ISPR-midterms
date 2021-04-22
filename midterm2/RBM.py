@@ -41,31 +41,32 @@ class RBM:
         """ Compute conditional probability of the hidden units given the visible ones """
         h_probs = sigmoid(np.add(np.matmul(self.W, v_sample), self.bias_hidden))
         h_samples = np.random.binomial(n=1, p=h_probs, size=len(h_probs))
-        return h_samples
+        return h_probs, h_samples
 
     def pv_h(self, h_sample):
         """ Compute conditional probability of the visible units given the hidden ones """
         v_probs = sigmoid(np.add(np.matmul(h_sample, self.W), self.bias_visible))
         v_samples = np.random.binomial(n=1, p=v_probs, size=len(v_probs))
-        return v_samples
+        return v_probs, v_samples
 
     def gibbs_sampling(self, h_sample, k):
         """ Performs Gibbs sampling """
-        v_sample = None  # in case it doesn't enter the cycle, but it shouldn't happen
+        # in case it doesn't enter the cycle, but it shouldn't happen
+        v_prob, v_sample, h_prob = None, None, None
         for i in range(k):
             v_prob = sigmoid(np.add(np.matmul(h_sample, self.W), self.bias_visible))
             v_sample = np.random.binomial(n=1, p=v_prob, size=len(v_prob))
             h_prob = sigmoid(np.add(np.matmul(self.W, v_sample), self.bias_hidden))
             h_sample = np.random.binomial(n=1, p=h_prob, size=len(h_prob))
-        return v_sample, h_sample
+        return v_prob, v_sample, h_prob, h_sample
 
     def contrastive_divergence(self, v_prob, k, lr):
         """ Perform one step of contrastive divergence """
         v_sample = np.random.binomial(n=1, p=v_prob, size=len(v_prob))
-        h_sample = self.ph_v(v_sample)
-        wake = np.outer(h_sample, v_sample)
-        v_sample_gibbs, h_sample_gibbs = self.gibbs_sampling(h_sample, k)
-        dream = np.outer(h_sample_gibbs, v_sample_gibbs)
+        h_probs, h_sample = self.ph_v(v_sample)
+        wake = np.outer(h_probs, v_sample)
+        v_probs_gibbs, v_sample_gibbs, h_probs_gibbs, h_sample_gibbs = self.gibbs_sampling(h_sample, k)
+        dream = np.outer(h_probs_gibbs, v_sample_gibbs)
         # weights update
         self.W += lr * np.subtract(wake, dream)
         self.bias_visible += lr * np.subtract(v_sample, v_sample_gibbs)
