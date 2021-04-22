@@ -72,7 +72,7 @@ class RBM:
         self.bias_visible += lr * np.subtract(v_sample, v_sample_gibbs)
         self.bias_hidden += lr * np.subtract(h_sample, h_sample_gibbs)
 
-    def fit(self, epochs, lr, k, mnist_path=None, save=True, save_path=None, fit_classifier=False):
+    def fit(self, epochs, lr, k, mnist_path=None, save=True, save_path=None, fit_classifier=False, show_feats=False):
         """ Perform model fitting """
         assert epochs >= 0 and lr > 0 and k > 0
         train_images, train_labels, test_images, test_labels = load_mnist(mnist_path)
@@ -86,6 +86,8 @@ class RBM:
 
         if save:
             self.save_model(datetime.now().strftime("rbm_%d-%m-%y_%H-%M") if save_path is None else save_path)
+        if show_feats:
+            self.show_learnt_features()
 
         if fit_classifier:
             # TODO: fix body of if statement -> messy for now
@@ -110,11 +112,7 @@ class RBM:
 
         train_labels = tf.stack(to_categorical(train_labels, 10))
         tr_set = tf.stack(tr_set)
-        self.classifier.compile(
-            optimizer='adam',
-            loss='categorical_crossentropy',
-            metrics='accuracy'
-        )
+        self.classifier.compile(optimizer='adam', loss='categorical_crossentropy', metrics='accuracy')
         self.classifier.fit(
             x=tr_set,
             y=train_labels,
@@ -145,16 +143,18 @@ class RBM:
             print(f"{k}: {v}")
 
     def show_learnt_features(self):
-        # TODO: improve and finish this method
-        # plot the weights to see learnt features
-        # not sure if it's right
-        for i in range(3):
-            fig, ax = plt.subplots(1, 2)
-            img = np.reshape(self.W[i], newshape=(28, 28))
-            ax[0].imshow(img)
-            img = np.reshape(self.W[:][i], newshape=(28, 28))
-            ax[1].imshow(img)
-            fig.show()
+        """
+        Shows the features learnt by the model,
+        i.e. each row of the weights matrix reshaped as image
+        """
+        fig, ax = plt.subplots(10, 10, figsize=(8, 8))
+        for i in range(10):
+            for j in range(10):
+                ax[i, j].imshow(np.reshape(self.W[10 * i + j], newshape=(28, 28)))
+                ax[i, j].axis('off')
+        fig.suptitle('Learnt features', fontsize='x-large')
+        fig.tight_layout()
+        fig.show()
 
     def save_model(self, path):
         """
