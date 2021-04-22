@@ -64,10 +64,8 @@ class RBM:
         # in case it doesn't enter the cycle, but it shouldn't happen
         v_prob, v_sample, h_prob = None, None, None
         for i in range(k):
-            v_prob = sigmoid(np.add(np.matmul(h_sample, self.W), self.bias_visible))
-            v_sample = np.random.binomial(n=1, p=v_prob, size=len(v_prob))
-            h_prob = sigmoid(np.add(np.matmul(self.W, v_sample), self.bias_hidden))
-            h_sample = np.random.binomial(n=1, p=h_prob, size=len(h_prob))
+            v_prob, v_sample = self.pv_h(h_sample)
+            h_prob, h_sample = self.ph_v(v_sample)
         return v_prob, v_sample, h_prob, h_sample
 
     def contrastive_divergence(self, v_probs, k, lr):
@@ -185,6 +183,23 @@ class RBM:
                 ax[i, j].imshow(np.reshape(self.W[10 * i + j], newshape=(28, 28)))
                 ax[i, j].axis('off')
         fig.suptitle('Learnt features', fontsize='x-large')
+        fig.tight_layout()
+        fig.show()
+
+    def show_reconstruction(self, img):
+        """
+        Plots a reconstruction of an image
+        :param img: (vector) the image to reconstruct
+        """
+        v_sample = np.random.binomial(n=1, p=img, size=len(img))
+        h_probs, h_sample = self.ph_v(v_sample)
+        v_probs, v_sample = self.pv_h(h_sample)
+        fig, ax = plt.subplots(1, 2)
+        ax[0].imshow(np.reshape(img, newshape=(28, 28)))
+        ax[0].set_title('Original image')
+        ax[1].imshow(np.reshape(v_probs, newshape=(28, 28)))
+        ax[1].set_title('Reconstructed image')
+        fig.suptitle('Reconstruction')
         fig.tight_layout()
         fig.show()
 

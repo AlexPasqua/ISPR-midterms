@@ -8,17 +8,17 @@ from utilities import load_mnist
 
 class MyTestCase(unittest.TestCase):
     def test_rbm(self):
-        imgs, _, ts, tsl = load_mnist(path="../MNIST/")
+        imgs, _, _, _ = load_mnist(path="../MNIST/")
         rbm = RBM(n_visible=len(imgs[0]), mnist_path='../MNIST/')
         rbm.fit(epochs=1,
                 lr=0.1,
                 k=1,
-                save=True,
+                save=False,
                 save_path="../models/rbm_weights.pickle",
                 fit_cl=True,
-                save_cl=True,
+                save_cl=False,
                 save_cl_path=None,
-                show_feats=True)
+                show_feats=False)
 
         # rbm.show_embedding(imgs[0])
         # rbm.show_embedding(imgs[1])
@@ -35,6 +35,7 @@ class MyTestCase(unittest.TestCase):
         # rbm.load_weights('here.pickle')
         # rbm.fit_classifier(load_rbm_weights=True, w_path='../models/rbm_weights.pickle', save=True)
         rbm.test_classifier()
+        rbm.show_reconstruction(imgs[0])
 
 
 if __name__ == '__main__':
