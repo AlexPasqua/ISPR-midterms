@@ -156,6 +156,23 @@ class RBM:
         fig.tight_layout()
         fig.show()
 
+    def show_embedding(self, img=None):
+        """
+        Shows the embedding for one image
+        :param img: vector representing an image
+        """
+        img = np.random.binomial(n=1, p=img, size=len(img))
+        probs, samples = self.ph_v(img)
+        fig, ax = plt.subplots(1, 2)
+        side_len = int(np.sqrt(self.n_hidden))
+        ax[0].imshow(np.reshape(probs, newshape=(side_len, side_len)), cmap='gray')
+        ax[0].set_title('Probabilities')
+        ax[1].imshow(np.reshape(samples, newshape=(side_len, side_len)), cmap='gray')
+        ax[1].set_title('Samples')
+        fig.suptitle('Embeddings')
+        fig.tight_layout()
+        fig.show()
+
     def save_model(self, path):
         """
         Saves the model on a pickle file

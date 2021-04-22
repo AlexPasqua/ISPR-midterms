@@ -12,8 +12,9 @@ class MyTestCase(unittest.TestCase):
                 k=1,
                 mnist_path="../MNIST/",
                 fit_classifier=False,
-                save_path="../models/prova.pickle",
-                show_feats=True)
+                save_path="../models/rbm_weights.pickle",
+                show_feats=False)
+        rbm.show_embedding(imgs[0])
         # rbm.save_model('here.pickle')
         # rbm.load_weights('here.pickle')
         # rbm.fit_classifier(load_rbm_weights=True, w_path='../models/prova.pickle', mnist_path='../MNIST/', save=False)
