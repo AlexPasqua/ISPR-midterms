@@ -2,19 +2,22 @@ import unittest
 import matplotlib.pyplot as plt
 import numpy as np
 from RBM import RBM
+import tensorflow as tf
 from utilities import load_mnist
 
 
 class MyTestCase(unittest.TestCase):
     def test_rbm(self):
-        imgs, _, _, _ = load_mnist(path="../MNIST/")
-        rbm = RBM(n_visible=len(imgs[0]))
+        imgs, _, ts, tsl = load_mnist(path="../MNIST/")
+        rbm = RBM(n_visible=len(imgs[0]), mnist_path='../MNIST/')
         rbm.fit(epochs=1,
                 lr=0.1,
                 k=1,
-                mnist_path="../MNIST/",
-                fit_classifier=True,
+                save=True,
                 save_path="../models/rbm_weights.pickle",
+                fit_cl=True,
+                save_cl=True,
+                save_cl_path=None,
                 show_feats=True)
 
         # rbm.show_embedding(imgs[0])
@@ -30,8 +33,8 @@ class MyTestCase(unittest.TestCase):
 
         # rbm.save_model('here.pickle')
         # rbm.load_weights('here.pickle')
-        # rbm.fit_classifier(load_rbm_weights=True, w_path='../models/prova.pickle', mnist_path='../MNIST/', save=False)
-        # rbm.test_classifier(mnist_path='../MNIST/')
+        # rbm.fit_classifier(load_rbm_weights=True, w_path='../models/rbm_weights.pickle', save=True)
+        rbm.test_classifier()
 
 
 if __name__ == '__main__':
