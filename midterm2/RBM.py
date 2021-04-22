@@ -60,13 +60,13 @@ class RBM:
             h_sample = np.random.binomial(n=1, p=h_prob, size=len(h_prob))
         return v_prob, v_sample, h_prob, h_sample
 
-    def contrastive_divergence(self, v_prob, k, lr):
+    def contrastive_divergence(self, v_probs, k, lr):
         """ Perform one step of contrastive divergence """
-        v_sample = np.random.binomial(n=1, p=v_prob, size=len(v_prob))
+        v_sample = np.random.binomial(n=1, p=v_probs, size=len(v_probs))
         h_probs, h_sample = self.ph_v(v_sample)
-        wake = np.outer(h_probs, v_sample)
+        wake = np.outer(h_probs, v_probs)
         v_probs_gibbs, v_sample_gibbs, h_probs_gibbs, h_sample_gibbs = self.gibbs_sampling(h_sample, k)
-        dream = np.outer(h_probs_gibbs, v_sample_gibbs)
+        dream = np.outer(h_probs_gibbs, v_probs_gibbs)
         # weights update
         self.W += lr * np.subtract(wake, dream)
         self.bias_visible += lr * np.subtract(v_sample, v_sample_gibbs)
@@ -82,7 +82,7 @@ class RBM:
 
         for ep in range(epochs):
             for i in tqdm(range(len(train_labels))):
-                self.contrastive_divergence(v_prob=train_images[i], k=k, lr=lr)
+                self.contrastive_divergence(v_probs=train_images[i], k=k, lr=lr)
 
         if save:
             self.save_model(datetime.now().strftime("rbm_%d-%m-%y_%H-%M") if save_path is None else save_path)
@@ -109,17 +109,10 @@ class RBM:
             encoding = sigmoid(np.add(np.matmul(self.W, train_images[i]), self.bias_hidden))
             encoding = np.random.binomial(n=1, p=encoding, size=len(encoding))
             tr_set.append(encoding)
-
         train_labels = tf.stack(to_categorical(train_labels, 10))
         tr_set = tf.stack(tr_set)
         self.classifier.compile(optimizer='adam', loss='categorical_crossentropy', metrics='accuracy')
-        self.classifier.fit(
-            x=tr_set,
-            y=train_labels,
-            epochs=5,
-            use_multiprocessing=True,
-            workers=4
-        )
+        self.classifier.fit(x=tr_set, y=train_labels, epochs=5)
         if save:
             save_path = datetime.now().strftime("classifier_%d-%m-%y_%H-%M") if save_path is None else save_path
             self.classifier.save(save_path)
@@ -129,16 +122,12 @@ class RBM:
             _, _, test_images, test_labels = load_mnist(mnist_path)
         test_encodings = []
         for i in range(len(test_labels)):
-            encoding = sigmoid(np.add(np.matmul(self.W, test_images[0]), self.bias_hidden))
+            encoding = sigmoid(np.add(np.matmul(self.W, test_images[i]), self.bias_hidden))
             encoding = np.random.binomial(n=1, p=encoding, size=len(encoding))
             test_encodings.append(encoding)
         test_encodings = tf.stack(test_encodings)
         test_labels = tf.stack(to_categorical(test_labels))
-        res = self.classifier.evaluate(
-            x=test_encodings,
-            y=test_labels,
-            return_dict=True
-        )
+        res = self.classifier.evaluate(x=test_encodings, y=test_labels, return_dict=True)
         for k, v in res.items():
             print(f"{k}: {v}")
 
