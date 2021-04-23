@@ -10,9 +10,10 @@ class MyTestCase(unittest.TestCase):
     def test_rbm(self):
         imgs, _, _, _ = load_mnist(path="../MNIST/")
         rbm = RBM(n_visible=len(imgs[0]), mnist_path='../MNIST/')
-        rbm.fit(epochs=1,
+        rbm.fit(epochs=3,
                 lr=0.1,
                 k=1,
+                batch_size=100,
                 save=False,
                 save_path="../models/rbm_weights.pickle",
                 fit_cl=True,
@@ -20,10 +21,10 @@ class MyTestCase(unittest.TestCase):
                 save_cl_path=None,
                 show_feats=False)
 
-        # rbm.show_embedding(imgs[0])
-        # rbm.show_embedding(imgs[1])
-        # rbm.show_embedding(imgs[2])
-        # rbm.show_embedding(imgs[3])
+        # rbm.show_encoding(imgs[0])
+        # rbm.show_encoding(imgs[1])
+        # rbm.show_encoding(imgs[2])
+        # rbm.show_encoding(imgs[3])
         # fig, ax = plt.subplots(2, 2)
         # ax[0, 0].imshow(np.reshape(imgs[0], newshape=(28, 28)))
         # ax[0, 1].imshow(np.reshape(imgs[1], newshape=(28, 28)))

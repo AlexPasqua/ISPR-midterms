@@ -87,12 +87,13 @@ class RBM:
         self.bias_visible += lr * np.subtract(v_sample, v_sample_gibbs)
         self.bias_hidden += lr * np.subtract(h_sample, h_sample_gibbs)
 
-    def fit(self, epochs, lr, k, save=False, save_path=None, fit_cl=False, save_cl=False, save_cl_path=None, show_feats=False):
+    def fit(self, epochs, lr, k, batch_size=50, save=False, save_path=None, fit_cl=False, save_cl=False, save_cl_path=None, show_feats=False):
         """
         Perform model fitting by contrastive divergence
         :param epochs: (int) number of epochs of training
         :param lr: (float) learning rate (0 < lr <= 1)
         :param k: (int) order of the Gibbs sampling
+        :param batch_size: (int) size of a batch/minibatch of training data
         :param save: (bool) if True, save the model's weights and biases
         :param save_path: (str) path where to save the model
         :param fit_cl: (bool) if True, fit the classifier on the encodings
@@ -102,11 +103,17 @@ class RBM:
         """
         assert epochs > 0 and 0 < lr <= 1 and k > 0
 
-        # TODO: remove following line -> it's for shortening the training set
-        # train_images, train_labels = train_images[:100], train_labels[:100]
+        # uncomment to shorten the training set for debugging purposes
+        # self.tr_imgs, self.tr_labels = self.tr_imgs[:100], self.tr_labels[:100]
 
-        # training cycle
+        # iterate over epochs
+        indexes = list(range(len(self.tr_imgs)))
         for ep in range(epochs):
+            # shuffle the data
+            np.random.shuffle(indexes)
+            self.tr_imgs = self.tr_imgs[indexes]
+            self.tr_labels = self.tr_labels[indexes]
+            # iterate over data samples
             for i in tqdm(range(len(self.tr_labels))):
                 self.contrastive_divergence(v_probs=self.tr_imgs[i], k=k, lr=lr)
 
@@ -203,7 +210,7 @@ class RBM:
         fig.tight_layout()
         fig.show()
 
-    def show_embedding(self, img=None):
+    def show_encoding(self, img=None):
         """
         Shows the embedding for one image
         :param img: vector representing an image
