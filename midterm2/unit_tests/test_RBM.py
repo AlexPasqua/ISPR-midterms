@@ -6,7 +6,7 @@ import tensorflow as tf
 from utilities import load_mnist
 
 
-class MyTestCase(unittest.TestCase):
+class TestRBM(unittest.TestCase):
     def test_rbm(self):
         imgs, _, _, _ = load_mnist(path="../MNIST/")
         rbm = RBM(n_visible=len(imgs[0]), mnist_path='../MNIST/')

@@ -8,7 +8,7 @@ from tensorflow.keras.layers import Dense
 from tensorflow.python.keras.utils.np_utils import to_categorical
 from datetime import datetime
 from tqdm import tqdm
-from utilities import load_mnist, sigmoid
+from utilities import *
 
 
 class RBM:
@@ -27,7 +27,7 @@ class RBM:
         """
         # load mnist dataset
         self.tr_imgs, self.tr_labels, self.ts_imgs, self.ts_labels = load_mnist(mnist_path)
-        # set weights and biases
+        # initialize weights and biases
         assert n_visible >= 0 and n_hidden >= 0
         self.n_visible = n_visible
         self.n_hidden = n_hidden
@@ -69,12 +69,11 @@ class RBM:
             h_prob, h_sample = self.ph_v(v_sample)
         return v_prob, v_sample, h_prob, h_sample
 
-    def contrastive_divergence(self, v_probs, k, lr):
+    def contrastive_divergence(self, v_probs, k):
         """
         Perform one step of contrastive divergence
         :param v_probs: vector of the visible units activations (non-binarized)
         :param k: (int) order of the Gibbs sampling
-        :param lr: (float) learning rate (0 < lr <= 1)
         """
         # compute wake part
         v_sample = np.random.binomial(n=1, p=v_probs, size=len(v_probs))
@@ -89,7 +88,7 @@ class RBM:
         delta_bh = np.subtract(h_sample, h_sample_gibbs)
         return delta_W, delta_bv, delta_bh
 
-    def fit(self, epochs, lr, k, bs=50, save=False, save_path=None, fit_cl=False, save_cl=False,
+    def fit(self, epochs, lr, k, bs=1, save=False, save_path=None, fit_cl=False, save_cl=False,
             save_cl_path=None, show_feats=False):
         """
         Perform model fitting by contrastive divergence
@@ -132,7 +131,7 @@ class RBM:
 
                 # cycle through patterns within a batch
                 for img in tqdm(batch_imgs, disable=disable_tqdm[1]):
-                    dW, dbv, dbh = self.contrastive_divergence(v_probs=img, k=k, lr=lr)
+                    dW, dbv, dbh = self.contrastive_divergence(v_probs=img, k=k)
                     delta_W = np.add(delta_W, dW)
                     delta_bv = np.add(delta_bv, dbv)
                     delta_bh = np.add(delta_bh, dbh)
