@@ -10,16 +10,16 @@ class MyTestCase(unittest.TestCase):
     def test_rbm(self):
         imgs, _, _, _ = load_mnist(path="../MNIST/")
         rbm = RBM(n_visible=len(imgs[0]), mnist_path='../MNIST/')
-        rbm.fit(epochs=3,
+        rbm.fit(epochs=1,
                 lr=0.1,
                 k=1,
-                batch_size=100,
+                bs='batch',
                 save=False,
                 save_path="../models/rbm_weights.pickle",
                 fit_cl=True,
                 save_cl=False,
                 save_cl_path=None,
-                show_feats=False)
+                show_feats=True)
 
         # rbm.show_encoding(imgs[0])
         # rbm.show_encoding(imgs[1])

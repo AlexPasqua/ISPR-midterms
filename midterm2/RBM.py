@@ -1,4 +1,5 @@
 import copy
+import math
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
@@ -82,18 +83,20 @@ class RBM:
         # compute dream part
         v_probs_gibbs, v_sample_gibbs, h_probs_gibbs, h_sample_gibbs = self.gibbs_sampling(h_sample, k)
         dream = np.outer(h_probs_gibbs, v_probs_gibbs)
-        # weights update
-        self.W += lr * np.subtract(wake, dream)
-        self.bias_visible += lr * np.subtract(v_sample, v_sample_gibbs)
-        self.bias_hidden += lr * np.subtract(h_sample, h_sample_gibbs)
+        # compute deltas
+        delta_W = np.subtract(wake, dream)
+        delta_bv = np.subtract(v_sample, v_sample_gibbs)
+        delta_bh = np.subtract(h_sample, h_sample_gibbs)
+        return delta_W, delta_bv, delta_bh
 
-    def fit(self, epochs, lr, k, batch_size=50, save=False, save_path=None, fit_cl=False, save_cl=False, save_cl_path=None, show_feats=False):
+    def fit(self, epochs, lr, k, bs=50, save=False, save_path=None, fit_cl=False, save_cl=False,
+            save_cl_path=None, show_feats=False):
         """
         Perform model fitting by contrastive divergence
         :param epochs: (int) number of epochs of training
         :param lr: (float) learning rate (0 < lr <= 1)
         :param k: (int) order of the Gibbs sampling
-        :param batch_size: (int) size of a batch/minibatch of training data
+        :param bs: (int) size of a batch/minibatch of training data
         :param save: (bool) if True, save the model's weights and biases
         :param save_path: (str) path where to save the model
         :param fit_cl: (bool) if True, fit the classifier on the encodings
@@ -107,15 +110,37 @@ class RBM:
         # self.tr_imgs, self.tr_labels = self.tr_imgs[:100], self.tr_labels[:100]
 
         # iterate over epochs
+        n_imgs = len(self.tr_labels)
+        bs = n_imgs if bs == 'batch' or bs > n_imgs else bs
+        disable_tqdm = (False, True) if bs < n_imgs else (True, False)  # for progress bars
         indexes = list(range(len(self.tr_imgs)))
         for ep in range(epochs):
             # shuffle the data
             np.random.shuffle(indexes)
             self.tr_imgs = self.tr_imgs[indexes]
             self.tr_labels = self.tr_labels[indexes]
-            # iterate over data samples
-            for i in tqdm(range(len(self.tr_labels))):
-                self.contrastive_divergence(v_probs=self.tr_imgs[i], k=k, lr=lr)
+
+            # cycle through batches
+            for batch_idx in tqdm(range(math.ceil(len(self.tr_labels) / bs)), disable=disable_tqdm[0]):
+                delta_W = np.zeros(shape=self.W.shape)
+                delta_bv = np.zeros(shape=(len(self.bias_visible),))
+                delta_bh = np.zeros(shape=(len(self.bias_hidden),))
+                start = batch_idx * bs
+                end = start + bs
+                batch_imgs = self.tr_imgs[start: end]
+                batch_labels = self.tr_labels[start: end]
+
+                # cycle through patterns within a batch
+                for img in tqdm(batch_imgs, disable=disable_tqdm[1]):
+                    dW, dbv, dbh = self.contrastive_divergence(v_probs=img, k=k, lr=lr)
+                    delta_W = np.add(delta_W, dW)
+                    delta_bv = np.add(delta_bv, dbv)
+                    delta_bh = np.add(delta_bh, dbh)
+
+                # weight update
+                self.W += (lr / bs) * delta_W
+                self.bias_visible += (lr / bs) * delta_bv
+                self.bias_hidden += (lr / bs) * delta_bh
 
         if save:
             self.save_model(datetime.now().strftime("rbm_%d-%m-%y_%H-%M") if save_path is None else save_path)
