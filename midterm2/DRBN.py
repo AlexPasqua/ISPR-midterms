@@ -1,4 +1,7 @@
+import datetime
 import math
+import pickle
+
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -23,6 +26,7 @@ class DRBN:
         assert [size > 0 for size in hl_sizes] and v_size > 0
         n_hl = len(hl_sizes)    # number of hidden layers
         self.nl = n_hl + 1      # number of layers
+        self.units_per_layer = np.concatenate(([v_size], hl_sizes))
         # load mnist dataset
         self.tr_imgs, self.tr_labels, self.ts_imgs, self.ts_labels = load_mnist(mnist_path)
         # initialize weights and biases
@@ -88,7 +92,7 @@ class DRBN:
         delta_b = [np.subtract(samples[i], samples_gibbs[i]) for i in range(self.nl)]
         return delta_W, delta_b
 
-    def fit(self, epochs, lr, k, bs=1):
+    def fit(self, epochs, lr, k, bs=1, save=False):
         assert epochs > 0 and 0 < lr <= 1 and k > 0
         n_imgs = len(self.tr_labels)
         bs = n_imgs if bs == 'batch' or bs > n_imgs else bs
@@ -123,6 +127,8 @@ class DRBN:
                     self.W_matrs[i] = np.add(self.W_matrs[i], np.multiply(rescaled_lr, delta_W[i]))
                     self.biases[i] = np.add(self.biases[i], np.multiply(rescaled_lr, delta_b[i]))
                 self.biases[-1] = np.add(self.biases[-1], np.multiply(rescaled_lr, delta_b[-1]))    # update last layer's bias
+        if save:
+            self.save_model(datetime.now().strftime("rbm_%d-%m-%y_%H-%M") if save_path is None else save_path)
 
     def show_reconstruction(self, img):
         """
@@ -139,3 +145,37 @@ class DRBN:
         fig.suptitle('Reconstruction')
         fig.tight_layout()
         fig.show()
+
+    def save_model(self, path):
+        """
+        Saves the model on a pickle file
+        :param path: the file where to save the model
+        """
+        path = path if (path.endswith('.pickle') or path.endswith('.pkl')) else path + '.pickle'
+        dump_dict = {'n_layers': self.nl,
+                     'units_per_layer': self.units_per_layer,
+                     'weights_matrices': self.W_matrs,
+                     'biases': self.biases}
+        with open(path, 'wb') as f:
+            pickle.dump(dump_dict, f)
+
+    def load_weights(self, path):
+        """
+        Loads the model's weights (and biases) from a pickle file.
+        The model's architecture must be compatible with the weights being loaded.
+        :param path: the path to the json file where the weights are stored
+        :raises FileNotFoundError: if path does not correspond to an existing file
+        :raises AssertionError: if the shape of the weights and biases is not compatible with model's architecture
+        """
+        with open(path, 'rb') as f:
+            data = pickle.load(f)
+            weights_matrices = data['weights_matrices']
+            biases = data['biases']
+            assert len(biases) == len(weights_matrices) + 1 == self.nl
+            for i in range(self.nl - 1):
+                weights_shape = np.shape(weights_matrices[i])
+                assert weights_shape[0] == self.units_per_layer[i + 1] and \
+                    weights_shape[1] == len(biases[i]) == self.units_per_layer[i]
+                self.W_matrs[i] = weights_matrices[i]
+                self.biases[i] = biases[i]
+            self.biases[-1] = biases[-1]
