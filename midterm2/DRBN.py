@@ -1,14 +1,16 @@
-import datetime
+import copy
 import math
 import pickle
-
 import numpy as np
 import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow.keras.layers import Dense
+from tensorflow.python.keras.utils.np_utils import to_categorical
 from tqdm import tqdm
+from datetime import datetime
 from utilities import load_mnist, sigmoid
 
 
-# noinspection PyTypeChecker
 class DRBN:
     """
     Implementation of a Deep Restricted Boltzmann Network
@@ -33,6 +35,11 @@ class DRBN:
         sizes = np.concatenate(([v_size], hl_sizes))
         self.W_matrs = [np.random.uniform(-1, 1, size=(sizes[i+1], sizes[i])) for i in range(n_hl)]
         self.biases = [np.zeros(sizes[i]) for i in range(n_hl + 1)]
+        # create classifier
+        self.classifier = tf.keras.models.Sequential([
+            Dense(units=50, activation='relu', input_dim=sizes[-1]),
+            Dense(units=10, activation='softmax')
+        ])
 
     def forward_step(self, layer_idx, prev_sample):
         """
@@ -56,6 +63,7 @@ class DRBN:
         samples = np.random.binomial(n=1, p=probs, size=len(probs))
         return probs, samples
 
+    # noinspection PyTypeChecker
     def forward(self, v_probs):
         v_sample = np.random.binomial(n=1, p=v_probs, size=len(v_probs))
         probs = [v_probs] + [None] * (self.nl - 1)
@@ -64,6 +72,7 @@ class DRBN:
             probs[i], samples[i] = self.forward_step(layer_idx=i, prev_sample=samples[i - 1])
         return probs, samples
 
+    # noinspection PyTypeChecker
     def backward(self, top_prob):
         top_sample = np.random.binomial(n=1, p=top_prob, size=len(top_prob))
         probs = [None] * (self.nl - 1) + [top_prob]
@@ -72,6 +81,7 @@ class DRBN:
             probs[i], samples[i] = self.backward_step(layer_idx=i, prev_sample=samples[i + 1])
         return probs, samples
 
+    # noinspection PyTypeChecker
     def gibbs_sampling(self, top_prob, k):
         samples = None  # in case it doesn't enter the cycle, but it shouldn't happen
         probs = [None] * (self.nl - 1) + [top_prob]
@@ -92,7 +102,7 @@ class DRBN:
         delta_b = [np.subtract(samples[i], samples_gibbs[i]) for i in range(self.nl)]
         return delta_W, delta_b
 
-    def fit(self, epochs, lr, k, bs=1, save=False):
+    def fit(self, epochs, lr, k, bs=1, save=False, save_path=None, fit_cl=False, save_cl=False, save_cl_path=None):
         assert epochs > 0 and 0 < lr <= 1 and k > 0
         n_imgs = len(self.tr_labels)
         bs = n_imgs if bs == 'batch' or bs > n_imgs else bs
@@ -129,6 +139,64 @@ class DRBN:
                 self.biases[-1] = np.add(self.biases[-1], np.multiply(rescaled_lr, delta_b[-1]))    # update last layer's bias
         if save:
             self.save_model(datetime.now().strftime("rbm_%d-%m-%y_%H-%M") if save_path is None else save_path)
+        if fit_cl:
+            self.fit_classifier()
+
+    def fit_classifier(self, load_drbn_weights=False, w_path=None, save=False, save_path=None):
+        """
+        Train the classifier on the embeddings of the RBM
+        :param load_drbn_weights: (bool) if True, load the weights of the DRBN from a file
+        :param w_path: (str) path where the DRBN's weights are stored
+        :param save: (bool) if True, save the classifier's weights
+        :param save_path: (str) path where the classifier's weights are stored
+        :returns hist: training history
+        """
+        # load weights of the RBM from file
+        if load_drbn_weights:
+            self.load_weights(w_path)
+        # create a training set by encoding all the training images
+        tr_set = []
+        for i in range(len(self.tr_labels)):
+            _, encoding = self.forward(v_probs=self.tr_imgs[i])
+            tr_set.append(encoding[-1])
+        # 1-hot encoding of the labels
+        train_labels = tf.stack(to_categorical(self.tr_labels, 10))
+        tr_set = tf.stack(tr_set)
+        # compile and fit the classifier
+        self.classifier.compile(optimizer='adam', loss='categorical_crossentropy', metrics='categorical_accuracy')
+        hist = self.classifier.fit(x=tr_set, y=train_labels, epochs=5)
+        # save the classifier's weights
+        if save:
+            save_path = datetime.now().strftime("classifier_%d-%m-%y_%H-%M.h5") if save_path is None else save_path
+            self.classifier.save_weights(save_path)
+        return hist
+
+    def test_classifier(self, test_images=None, test_labels=None):
+        """
+        Evaluate the classifier
+        :param test_images: specific set of test images (optional)
+        :param test_labels: specific set of test labels (optional)
+        :return: results of the test -> loss and accuracy
+        """
+        # if a specific set of test images and labels is NOT specified, use the MNIST test set
+        if test_images is not None and test_labels is not None:
+            assert len(test_images) == len(test_labels)
+        elif not(test_images is None and test_labels is None):
+            raise RuntimeWarning("The number of test images differs from the number of test labels. MNIST test set is going to be used")
+        if test_images is None:
+            test_images = self.ts_imgs
+            test_labels = copy.deepcopy(self.ts_labels)
+        # create a test set by encoding all the test images
+        test_encodings = []
+        for i in range(len(test_labels)):
+            _, encoding = self.forward(v_probs=test_images[i])
+            test_encodings.append(encoding[-1])
+        # 1-hot encoding of the test labels
+        test_encodings = tf.stack(test_encodings)
+        test_labels = tf.stack(to_categorical(test_labels))
+        # classifier evaluation
+        res = self.classifier.evaluate(x=test_encodings, y=test_labels, return_dict=True)
+        return res
 
     def show_reconstruction(self, img):
         """
