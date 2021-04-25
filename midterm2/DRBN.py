@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras.layers import Dense
 from tensorflow.python.keras.utils.np_utils import to_categorical
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
 from tqdm import tqdm
 from datetime import datetime
 from utilities import load_mnist, sigmoid
@@ -197,6 +199,31 @@ class DRBN:
         # classifier evaluation
         res = self.classifier.evaluate(x=test_encodings, y=test_labels, return_dict=True)
         return res
+
+    def confusion_matrix(self, test_images=None, test_labels=None):
+        # if a specific set of test images and labels is NOT specified, use the MNIST test set
+        if test_images is not None and test_labels is not None:
+            assert len(test_images) == len(test_labels)
+        elif not (test_images is None and test_labels is None):
+            raise RuntimeWarning("The number of test images differs from the number of test labels. MNIST test set is going to be used")
+        if test_images is None:
+            test_images = self.ts_imgs
+            test_labels = copy.deepcopy(self.ts_labels)
+        # create a test set by encoding all the test images
+        test_encodings = []
+        for i in range(len(test_images)):
+            _, encoding = self.forward(v_probs=test_images[i])
+            test_encodings.append(encoding[-1])
+        predictions = self.classifier.predict(tf.stack(test_encodings))
+        predictions = np.argmax(predictions, axis=1)
+        conf_matr = confusion_matrix(y_true=test_labels, y_pred=predictions)
+        plt.figure(figsize=(7, 5))
+        sns.heatmap(conf_matr, annot=True, annot_kws={'size': 8})
+        plt.xlabel('True labels')
+        plt.ylabel('Predictions')
+        plt.title('Confusion matrix')
+        plt.tight_layout()
+        plt.show()
 
     def show_reconstruction(self, img):
         """

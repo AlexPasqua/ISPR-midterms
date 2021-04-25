@@ -26,8 +26,9 @@ class TestDRBN(unittest.TestCase):
         new_drbn.load_weights('../models/DRBN_weights.pickle')
         new_drbn.fit_classifier()
         new_drbn.test_classifier()
-        new_drbn.show_reconstruction(img=tr_imgs[0])
-        new_drbn.show_reconstruction(img=tr_imgs[1])
+        # new_drbn.show_reconstruction(img=tr_imgs[0])
+        # new_drbn.show_reconstruction(img=tr_imgs[1])
+        new_drbn.confusion_matrix()
 
 
 if __name__ == '__main__':
