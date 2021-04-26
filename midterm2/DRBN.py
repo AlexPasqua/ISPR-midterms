@@ -144,28 +144,42 @@ class DRBN:
         if fit_cl:
             self.fit_classifier()
 
-    def fit_classifier(self, load_drbn_weights=False, w_path=None, save=False, save_path=None):
+    def encode(self, images=None):
+        # create a training set by encoding all the training images
+        """
+        Creates the encodings for the images to feed the classifier
+        :param images: (str or array-like) it specifies what images to encode:
+            'train': encode MNIST training images
+            'test': encode MNIST test images
+            array-like: the images themselves as a bi-dimensional array (matrix) where each row is an image
+        :return: the encoded images as a matrix (each row is an image)
+        """
+        images = self.tr_imgs if images == 'train' else (self.ts_imgs if images == 'test' else images)
+        encodings = []
+        for i in range(len(images)):
+            _, enc = self.forward(v_probs=images[i])
+            encodings.append(enc[-1])
+        return encodings
+
+    def fit_classifier(self, load_boltz_weights=False, w_path=None, save=False, save_path=None):
         """
         Train the classifier on the embeddings of the RBM
-        :param load_drbn_weights: (bool) if True, load the weights of the DRBN from a file
+        :param load_boltz_weights: (bool) if True, load the weights of the DRBN from a file
         :param w_path: (str) path where the DRBN's weights are stored
         :param save: (bool) if True, save the classifier's weights
         :param save_path: (str) path where the classifier's weights are stored
         :returns hist: training history
         """
         # load weights of the RBM from file
-        if load_drbn_weights:
+        if load_boltz_weights:
             self.load_weights(w_path)
         # create a training set by encoding all the training images
-        tr_set = []
-        for i in range(len(self.tr_labels)):
-            _, encoding = self.forward(v_probs=self.tr_imgs[i])
-            tr_set.append(encoding[-1])
+        tr_set = self.encode('train')
         # 1-hot encoding of the labels
         train_labels = tf.stack(to_categorical(self.tr_labels, 10))
         tr_set = tf.stack(tr_set)
         # compile and fit the classifier
-        self.classifier.compile(optimizer='adam', loss='categorical_crossentropy', metrics='categorical_accuracy')
+        self.classifier.compile(optimizer='adam', loss='categorical_crossentropy', metrics='accuracy')
         hist = self.classifier.fit(x=tr_set, y=train_labels, epochs=5)
         # save the classifier's weights
         if save:
@@ -189,10 +203,7 @@ class DRBN:
             test_images = self.ts_imgs
             test_labels = copy.deepcopy(self.ts_labels)
         # create a test set by encoding all the test images
-        test_encodings = []
-        for i in range(len(test_labels)):
-            _, encoding = self.forward(v_probs=test_images[i])
-            test_encodings.append(encoding[-1])
+        test_encodings = self.encode('test')
         # 1-hot encoding of the test labels
         test_encodings = tf.stack(test_encodings)
         test_labels = tf.stack(to_categorical(test_labels))
@@ -274,3 +285,30 @@ class DRBN:
                 self.W_matrs[i] = weights_matrices[i]
                 self.biases[i] = biases[i]
             self.biases[-1] = biases[-1]
+
+
+if __name__ == '__main__':
+    tr_imgs, tr_labels, ts_imgs, ts_labels = load_mnist()
+    drbn = DRBN(hl_sizes=(500, 100), v_size=len(tr_imgs[0]), mnist_path='MNIST/')
+    drbn.fit(epochs=1,
+             lr=0.05,
+             k=1,
+             bs=10,
+             save=True,
+             save_path='models/DRBN_weights.pickle',
+             fit_cl=True,
+             save_cl=False,
+             save_cl_path=None)
+    # drbn.show_reconstruction(img=tr_imgs[0])
+    # drbn.show_reconstruction(img=tr_imgs[1])
+    drbn.test_classifier()
+    # drbn.show_reconstruction(img=tr_imgs[2])
+    # drbn.show_reconstruction(img=tr_imgs[3])
+    # drbn.save_model('../models/DRBN_weights.pickle')
+    # new_drbn = DRBN(hl_sizes=(500, 100), v_size=len(tr_imgs[0]), mnist_path='../MNIST/')
+    # new_drbn.load_weights('../models/DRBN_weights.pickle')
+    # new_drbn.fit_classifier()
+    # new_drbn.test_classifier()
+    # new_drbn.show_reconstruction(img=tr_imgs[0])
+    # new_drbn.show_reconstruction(img=tr_imgs[1])
+    # new_drbn.confusion_matrix()

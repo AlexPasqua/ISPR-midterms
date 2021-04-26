@@ -1,17 +1,13 @@
-import copy
 import math
-import pickle
 import numpy as np
 import matplotlib.pyplot as plt
-import tensorflow as tf
-from tensorflow.keras.layers import Dense
-from tensorflow.python.keras.utils.np_utils import to_categorical
 from datetime import datetime
 from tqdm import tqdm
-from utilities import *
+from utilities import sigmoid, load_mnist
+from DRBN import DRBN
 
 
-class RBM:
+class RBM(DRBN):
     """ Implementation of a Restricted Boltzmann Machine """
 
     def __init__(self, n_visible, n_hidden=100, W=None, bias_visible=None, bias_hidden=None, mnist_path=None):
@@ -25,24 +21,24 @@ class RBM:
         :param mnist_path: the path to the directory containing MNIST
         :raises AssertionError: if there are incompatibilities between parameters
         """
-        # load mnist dataset
-        self.tr_imgs, self.tr_labels, self.ts_imgs, self.ts_labels = load_mnist(mnist_path)
-        # initialize weights and biases
-        assert n_visible >= 0 and n_hidden >= 0
+        super().__init__(hl_sizes=(n_hidden,), v_size=n_visible, mnist_path=mnist_path)
         self.n_visible = n_visible
         self.n_hidden = n_hidden
         weights_shape = (n_hidden, n_visible)
-        self.W = W if W is not None else np.random.uniform(-1, 1, size=weights_shape)
+        self.W_matrs[0] = W if W is not None else np.random.uniform(-1, 1, size=weights_shape)
         self.bias_visible = bias_visible if bias_visible is not None else np.zeros(n_visible)
         self.bias_hidden = bias_hidden if bias_hidden is not None else np.zeros(n_hidden)
-        assert self.W.shape == weights_shape and \
+        assert self.W_matrs[0].shape == weights_shape and \
                n_visible == len(self.bias_visible) and \
                n_hidden == len(self.bias_hidden)
-        # create classifier
-        self.classifier = tf.keras.models.Sequential([
-            Dense(units=50, activation='relu', input_dim=n_hidden),
-            Dense(units=10, activation='softmax')
-        ])
+
+    @property
+    def W(self):
+        return self.W_matrs[0]
+
+    @W.setter
+    def W(self, value):
+        self.W_matrs[0] = value
 
     def ph_v(self, v_sample):
         """ Compute conditional probability and samples of the hidden units given the visible ones """
@@ -149,60 +145,6 @@ class RBM:
             # train the classifier on the embeddings
             self.fit_classifier(save=save_cl, save_path=save_cl_path)
 
-    def fit_classifier(self, load_rbm_weights=False, w_path=None, save=True, save_path=None):
-        """
-        Train the classifier on the embeddings of the RBM
-        :param load_rbm_weights: (bool) if True, load the weights of the RBM from a file
-        :param w_path: (str) path where the RBM's weights are stored
-        :param save: (bool) if True, save the classifier's weights
-        :param save_path: (str) path where the classifier's weights are stored
-        :returns hist: training history
-        """
-        # load weights of the RBM from file
-        if load_rbm_weights:
-            self.load_weights(w_path)
-        # create a training set by encoding all the training images
-        tr_set = []
-        for i in range(len(self.tr_labels)):
-            encoding = sigmoid(np.add(np.matmul(self.W, self.tr_imgs[i]), self.bias_hidden))
-            encoding = np.random.binomial(n=1, p=encoding, size=len(encoding))
-            tr_set.append(encoding)
-        # 1-hot encoding of the labels
-        train_labels = tf.stack(to_categorical(self.tr_labels, 10))
-        tr_set = tf.stack(tr_set)
-        # compile and fit the classifier
-        self.classifier.compile(optimizer='adam', loss='categorical_crossentropy', metrics='categorical_accuracy')
-        hist = self.classifier.fit(x=tr_set, y=train_labels, epochs=5)
-        # save the classifier's weights
-        if save:
-            save_path = datetime.now().strftime("classifier_%d-%m-%y_%H-%M.h5") if save_path is None else save_path
-            self.classifier.save_weights(save_path)
-        return hist
-
-    def test_classifier(self, test_images=None, test_labels=None):
-        """
-        Evaluate the classifier
-        :param test_images: specific set of test images (optional)
-        :param test_labels: specific set of test labels (optional)
-        :return: results of the test -> loss and accuracy
-        """
-        # if a specific set of test images and labels is NOT specified, use the MNIST test set
-        if test_images is None:
-            test_images = self.ts_imgs
-            test_labels = copy.deepcopy(self.ts_labels)
-        # create a test set by encoding all the test images
-        test_encodings = []
-        for i in range(len(test_labels)):
-            encoding = sigmoid(np.add(np.matmul(self.W, test_images[i]), self.bias_hidden))
-            encoding = np.random.binomial(n=1, p=encoding, size=len(encoding))
-            test_encodings.append(encoding)
-        # 1-hot encoding of the test labels
-        test_encodings = tf.stack(test_encodings)
-        test_labels = tf.stack(to_categorical(test_labels))
-        # classifier evaluation
-        res = self.classifier.evaluate(x=test_encodings, y=test_labels, return_dict=True)
-        return res
-
     def show_learnt_features(self):
         """
         Shows the features learnt by the model,
@@ -251,35 +193,36 @@ class RBM:
         fig.tight_layout()
         fig.show()
 
-    def save_model(self, path):
-        """
-        Saves the model on a pickle file
-        :param path: the file where to save the model
-        """
-        path = path if (path.endswith('.pickle') or path.endswith('.pkl')) else path + '.pickle'
-        dump_dict = {'n_visible': self.n_visible,
-                     'n_hidden': self.n_hidden,
-                     'weights': self.W,
-                     'bias_visible': self.bias_visible,
-                     'bias_hidden': self.bias_hidden}
-        with open(path, 'wb') as f:
-            pickle.dump(dump_dict, f)
 
-    def load_weights(self, path):
-        """
-        Loads the model's weights (and biases) from a pickle file.
-        The model's architecture must be compatible with the weights being loaded.
-        :param path: the path to the json file where the weights are stored
-        :raises FileNotFoundError: if path does not correspond to an existing file
-        :raises AssertionError: if the shape of the weights and biases is not compatible with model's architecture
-        """
-        with open(path, 'rb') as f:
-            data = pickle.load(f)
-            weights = data['weights']
-            bias_visible = data['bias_visible']
-            bias_hidden = data['bias_hidden']
-            assert len(weights[0]) == len(bias_visible) == self.n_visible and \
-                   len(weights[:, 0]) == len(bias_hidden) == self.n_hidden
-            self.W = weights
-            self.bias_visible = bias_visible
-            self.bias_hidden = bias_hidden
+if __name__ == '__main__':
+    imgs, _, _, _ = load_mnist(path="MNIST/")
+    rbm = RBM(n_visible=len(imgs[0]), mnist_path='MNIST/')
+    rbm.fit(epochs=1,
+            lr=0.1,
+            k=1,
+            bs=1,
+            save=False,
+            save_path="models/rbm_weights.pickle",
+            fit_cl=True,
+            save_cl=False,
+            save_cl_path=None,
+            show_feats=True)
+
+    # rbm.show_encoding(imgs[0])
+    # rbm.show_encoding(imgs[1])
+    # rbm.show_encoding(imgs[2])
+    # rbm.show_encoding(imgs[3])
+    # fig, ax = plt.subplots(2, 2)
+    # ax[0, 0].imshow(np.reshape(imgs[0], newshape=(28, 28)))
+    # ax[0, 1].imshow(np.reshape(imgs[1], newshape=(28, 28)))
+    # ax[1, 0].imshow(np.reshape(imgs[2], newshape=(28, 28)))
+    # ax[1, 1].imshow(np.reshape(imgs[3], newshape=(28, 28)))
+    # fig.show()
+    # rbm.save_model('here.pickle')
+    # rbm.load_weights('here.pickle')
+    # rbm.fit_classifier(load_boltz_weights=True, w_path='../models/rbm_weights.pickle', save=True)
+    # rbm.test_classifier()
+    # rbm.show_reconstruction(imgs[0])
+    # rbm.show_reconstruction(imgs[1])
+    # rbm.show_reconstruction(imgs[2])
+    # rbm.show_reconstruction(imgs[3])

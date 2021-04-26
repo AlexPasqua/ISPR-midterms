@@ -1,7 +1,5 @@
-import pickle
 import numpy as np
 from mlxtend.data import loadlocal_mnist
-from RBM import *
 
 
 def load_mnist(path=None):
@@ -21,23 +19,6 @@ def load_mnist(path=None):
     train_images = np.divide(np.subtract(train_images, min_tr), max_tr - min_tr)
     test_images = np.divide(np.subtract(test_images, min_ts), max_ts - min_ts)
     return train_images, train_labels, test_images, test_labels
-
-
-def load_model(path):
-    """
-    Loads a model from pickle file
-    :param path: path to the pickle file containing the model
-    :return: the RBM object
-    """
-    with open(path, 'rb') as f:
-        data = pickle.load(f)
-    return RBM(
-        n_visible=data['n_visible'],
-        n_hidden=data['n_hidden'],
-        W=data['weights'],
-        bias_visible=data['bias_visible'],
-        bias_hidden=data['bias_hidden']
-    )
 
 
 def sigmoid(x):
