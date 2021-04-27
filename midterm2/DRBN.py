@@ -289,20 +289,21 @@ class DRBN:
 
 if __name__ == '__main__':
     tr_imgs, tr_labels, ts_imgs, ts_labels = load_mnist()
-    drbn = DRBN(hl_sizes=(500, 100), v_size=len(tr_imgs[0]), mnist_path='MNIST/')
-    drbn.fit(epochs=1,
-             lr=0.05,
-             k=1,
-             bs=10,
-             save=True,
-             save_path='models/DRBN_weights.pickle',
-             fit_cl=True,
-             save_cl=False,
-             save_cl_path=None)
-    # drbn.show_reconstruction(img=tr_imgs[0])
-    # drbn.show_reconstruction(img=tr_imgs[1])
-    drbn.test_classifier()
-    # drbn.show_reconstruction(img=tr_imgs[2])
+    drbn = DRBN(hl_sizes=(100,), v_size=len(tr_imgs[0]), mnist_path='MNIST/')
+    # drbn.fit(epochs=1,
+    #          lr=0.1,
+    #          k=1,
+    #          bs=1,
+    #          save=True,
+    #          save_path='models/DRBN_weights.pickle',
+    #          fit_cl=False,
+    #          save_cl=False,
+    #          save_cl_path=None)
+    # drbn.test_classifier()
+    drbn.load_weights('models/DRBN_weights.pickle')
+    drbn.show_reconstruction(img=tr_imgs[0])
+    drbn.show_reconstruction(img=tr_imgs[1])
+    drbn.show_reconstruction(img=tr_imgs[2])
     # drbn.show_reconstruction(img=tr_imgs[3])
     # drbn.save_model('../models/DRBN_weights.pickle')
     # new_drbn = DRBN(hl_sizes=(500, 100), v_size=len(tr_imgs[0]), mnist_path='../MNIST/')

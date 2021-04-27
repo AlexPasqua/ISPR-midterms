@@ -25,9 +25,7 @@ class RBM(DRBN):
         self.n_visible = n_visible
         self.n_hidden = n_hidden
         weights_shape = (n_hidden, n_visible)
-        self.W_matrs[0] = W if W is not None else np.random.uniform(-1, 1, size=weights_shape)
-        self.bias_visible = bias_visible if bias_visible is not None else np.zeros(n_visible)
-        self.bias_hidden = bias_hidden if bias_hidden is not None else np.zeros(n_hidden)
+        self.W_matrs[0] = W if W is not None else self.W_matrs[0]
         assert self.W_matrs[0].shape == weights_shape and \
                n_visible == len(self.bias_visible) and \
                n_hidden == len(self.bias_hidden)
@@ -39,6 +37,22 @@ class RBM(DRBN):
     @W.setter
     def W(self, value):
         self.W_matrs[0] = value
+
+    @property
+    def bias_visible(self):
+        return self.biases[0]
+
+    @bias_visible.setter
+    def bias_visible(self, value):
+        self.biases[0] = value
+
+    @property
+    def bias_hidden(self):
+        return self.biases[1]
+
+    @bias_hidden.setter
+    def bias_hidden(self, value):
+        self.biases[1] = value
 
     def ph_v(self, v_sample):
         """ Compute conditional probability and samples of the hidden units given the visible ones """
@@ -197,16 +211,16 @@ class RBM(DRBN):
 if __name__ == '__main__':
     imgs, _, _, _ = load_mnist(path="MNIST/")
     rbm = RBM(n_visible=len(imgs[0]), mnist_path='MNIST/')
-    rbm.fit(epochs=1,
-            lr=0.1,
-            k=1,
-            bs=1,
-            save=False,
-            save_path="models/rbm_weights.pickle",
-            fit_cl=True,
-            save_cl=False,
-            save_cl_path=None,
-            show_feats=True)
+    # rbm.fit(epochs=1,
+    #         lr=0.1,
+    #         k=1,
+    #         bs=1,
+    #         save=True,
+    #         save_path="models/RBM_weights.pickle",
+    #         fit_cl=False,
+    #         save_cl=False,
+    #         save_cl_path=None,
+    #         show_feats=False)
 
     # rbm.show_encoding(imgs[0])
     # rbm.show_encoding(imgs[1])
@@ -219,7 +233,7 @@ if __name__ == '__main__':
     # ax[1, 1].imshow(np.reshape(imgs[3], newshape=(28, 28)))
     # fig.show()
     # rbm.save_model('here.pickle')
-    # rbm.load_weights('here.pickle')
+    # rbm.load_weights('models/RBM_weights.pickle')
     # rbm.fit_classifier(load_boltz_weights=True, w_path='../models/rbm_weights.pickle', save=True)
     # rbm.test_classifier()
     # rbm.show_reconstruction(imgs[0])
