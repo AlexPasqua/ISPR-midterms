@@ -1,3 +1,4 @@
+import argparse
 import copy
 import math
 import pickle
@@ -288,22 +289,40 @@ class DRBN:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Implementation of a Deep Restricted Boltzmann Network")
+    parser.add_argument('--hl_sizes', action='store', type=int, nargs='+', default=(100,))
+    parser.add_argument('--train', action='store_true')
+    parser.add_argument('--epochs', action='store', type=int, default=1, help='Number of epochs of training')
+    parser.add_argument('--lr', action='store', type=float, default=0.1, help='Learning rate')
+    parser.add_argument('--k', action='store', type=int, default=1, help='Learning rate')
+    parser.add_argument('--bs', action='store', type=int, default=1, help='Batch size')
+    parser.add_argument('--save', '-s', action='store_true', help="Save or not the DRBN's weights")
+    parser.add_argument('--save_path', action='store', type=str, help="Path to save the DRBN's weights")
+    parser.add_argument('--fit_cl', action='store_true', help="Train or not the classifier")
+    parser.add_argument('--load_w', '-ldw', action='store_true', help="Load or not the DRBN's weights from file")
+    parser.add_argument('--w_path', action='store', type=str, help="Path to the DRBN's weights")
+    args = parser.parse_args()
+
     tr_imgs, tr_labels, ts_imgs, ts_labels = load_mnist()
-    drbn = DRBN(hl_sizes=(100,), v_size=len(tr_imgs[0]), mnist_path='MNIST/')
-    # drbn.fit(epochs=1,
-    #          lr=0.1,
-    #          k=1,
-    #          bs=1,
-    #          save=True,
-    #          save_path='models/DRBN_weights.pickle',
-    #          fit_cl=False,
-    #          save_cl=False,
-    #          save_cl_path=None)
-    # drbn.test_classifier()
-    drbn.load_weights('models/DRBN_weights.pickle')
-    drbn.show_reconstruction(img=tr_imgs[0])
-    drbn.show_reconstruction(img=tr_imgs[1])
-    drbn.show_reconstruction(img=tr_imgs[2])
+    drbn = DRBN(hl_sizes=args.hl_sizes, v_size=len(tr_imgs[0]), mnist_path='MNIST/')
+    if args.train:
+        drbn.fit(epochs=args.epochs,
+                 lr=args.lr,
+                 k=args.k,
+                 bs=args.bs,
+                 save=args.save,
+                 save_path=args.save_path,
+                 fit_cl=args.fit_cl,
+                 save_cl=False,
+                 save_cl_path=None)
+    else:
+        drbn.fit_classifier(load_boltz_weights=args.load_w, w_path=args.w_path)
+        drbn.test_classifier()
+
+    # drbn.load_weights('models/DRBN_weights.pickle')
+    # drbn.show_reconstruction(img=tr_imgs[0])
+    # drbn.show_reconstruction(img=tr_imgs[1])
+    # drbn.show_reconstruction(img=tr_imgs[2])
     # drbn.show_reconstruction(img=tr_imgs[3])
     # drbn.save_model('../models/DRBN_weights.pickle')
     # new_drbn = DRBN(hl_sizes=(500, 100), v_size=len(tr_imgs[0]), mnist_path='../MNIST/')

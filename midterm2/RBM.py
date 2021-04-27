@@ -27,6 +27,8 @@ class RBM(DRBN):
         self.n_hidden = n_hidden
         weights_shape = (n_hidden, n_visible)
         self.W_matrs[0] = W if W is not None else self.W_matrs[0]
+        self.bias_visible = bias_visible if bias_visible is not None else self.bias_visible
+        self.bias_hidden = bias_hidden if bias_hidden is not None else self.bias_hidden
         assert self.W_matrs[0].shape == weights_shape and \
                n_visible == len(self.bias_visible) and \
                n_hidden == len(self.bias_hidden)
@@ -138,7 +140,6 @@ class RBM(DRBN):
                 start = batch_idx * bs
                 end = start + bs
                 batch_imgs = self.tr_imgs[start: end]
-                batch_labels = self.tr_labels[start: end]
 
                 # cycle through patterns within a batch
                 for img in tqdm(batch_imgs, disable=disable_tqdm[1]):
@@ -238,6 +239,7 @@ if __name__ == '__main__':
                 show_feats=False)
     else:
         rbm.fit_classifier(load_boltz_weights=args.load_w, w_path=args.w_path)
+        rbm.test_classifier()
 
     # rbm.show_encoding(imgs[0])
     # rbm.show_encoding(imgs[1])
