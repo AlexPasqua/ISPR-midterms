@@ -1,3 +1,4 @@
+import argparse
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -209,18 +210,34 @@ class RBM(DRBN):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Implementation of a Restricted Boltzmann Machine")
+    parser.add_argument('--train', action='store_true')
+    parser.add_argument('--epochs', action='store', type=int, default=1, help='Number of epochs of training')
+    parser.add_argument('--lr', action='store', type=float, default=0.1, help='Learning rate')
+    parser.add_argument('--k', action='store', type=int, default=1, help='Learning rate')
+    parser.add_argument('--bs', action='store', type=int, default=1, help='Batch size')
+    parser.add_argument('--save', '-s', action='store_true', help="Save or not the RBM's weights")
+    parser.add_argument('--save_path', action='store', type=str, help="Path to save the RBM's weights")
+    parser.add_argument('--fit_cl', action='store_true', help="Train or not the classifier")
+    parser.add_argument('--load_w', '-ldw', action='store_true', help="Load or not the RBM's weights from file")
+    parser.add_argument('--w_path', action='store', type=str, help="Path to the RBM's weights")
+    args = parser.parse_args()
+
     imgs, _, _, _ = load_mnist(path="MNIST/")
     rbm = RBM(n_visible=len(imgs[0]), mnist_path='MNIST/')
-    # rbm.fit(epochs=1,
-    #         lr=0.1,
-    #         k=1,
-    #         bs=1,
-    #         save=True,
-    #         save_path="models/RBM_weights.pickle",
-    #         fit_cl=False,
-    #         save_cl=False,
-    #         save_cl_path=None,
-    #         show_feats=False)
+    if args.train:
+        rbm.fit(epochs=args.epochs,
+                lr=args.lr,
+                k=args.k,
+                bs=args.bs,
+                save=args.save,
+                save_path=args.save_path,
+                fit_cl=args.fit_cl,
+                save_cl=False,
+                save_cl_path=None,
+                show_feats=False)
+    else:
+        rbm.fit_classifier(load_boltz_weights=args.load_w, w_path=args.w_path)
 
     # rbm.show_encoding(imgs[0])
     # rbm.show_encoding(imgs[1])
@@ -234,7 +251,7 @@ if __name__ == '__main__':
     # fig.show()
     # rbm.save_model('here.pickle')
     # rbm.load_weights('models/RBM_weights.pickle')
-    # rbm.fit_classifier(load_boltz_weights=True, w_path='../models/rbm_weights.pickle', save=True)
+    # rbm.fit_classifier(load_boltz_weights=True, w_path='models/RBM_weights.pickle', save=False)
     # rbm.test_classifier()
     # rbm.show_reconstruction(imgs[0])
     # rbm.show_reconstruction(imgs[1])
