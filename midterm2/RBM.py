@@ -101,7 +101,7 @@ class RBM(DRBN):
         delta_bh = np.subtract(h_sample, h_sample_gibbs)
         return delta_W, delta_bv, delta_bh
 
-    def fit(self, epochs, lr, k, bs=1, save=False, save_path=None, fit_cl=False, save_cl=False,
+    def fit(self, epochs=1, lr=0.1, k=1, bs=1, save=False, save_path=None, fit_cl=False, save_cl=False,
             save_cl_path=None, show_feats=False):
         """
         Perform model fitting by contrastive divergence

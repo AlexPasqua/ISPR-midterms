@@ -29,15 +29,16 @@ class DRBN:
         """
         # check parameters
         assert [size > 0 for size in hl_sizes] and v_size > 0
-        n_hl = len(hl_sizes)    # number of hidden layers
-        self.nl = n_hl + 1      # number of layers
+        n_hl = len(hl_sizes)  # number of hidden layers
+        self.nl = n_hl + 1  # number of layers
         self.units_per_layer = np.concatenate(([v_size], hl_sizes))
         # load mnist dataset
         self.tr_imgs, self.tr_labels, self.ts_imgs, self.ts_labels = load_mnist(mnist_path)
         # initialize weights and biases
         sizes = np.concatenate(([v_size], hl_sizes))
-        self.W_matrs = [np.random.uniform(-1, 1, size=(sizes[i+1], sizes[i])) for i in range(n_hl)]
+        self.W_matrs = [np.random.uniform(-1, 1, size=(sizes[i + 1], sizes[i])) for i in range(n_hl)]
         self.biases = [np.zeros(sizes[i]) for i in range(n_hl + 1)]
+        self.particle = np.zeros(sizes[0])
         # create classifier
         self.classifier = tf.keras.models.Sequential([
             Dense(units=50, activation='relu', input_dim=sizes[-1]),
@@ -93,24 +94,49 @@ class DRBN:
             probs, samples = self.forward(probs[0])
         return probs, samples
 
-    def persistent_contrastive_divergence(self, v_probs, k):
+    def compute_deltas(self, wake_terms, dream_terms, samples, samples_gibbs):
+        """ Compute delta weights and delta biases """
+        delta_W = [np.subtract(wake_terms[i], dream_terms[i]) for i in range(self.nl - 1)]
+        delta_b = [np.subtract(samples[i], samples_gibbs[i]) for i in range(self.nl)]
+        return delta_W, delta_b
+
+    def persistent_contrastive_divergence(self, v_probs, k=1, persist=False):
+        # compute wake terms
+        probs, samples = self.forward(v_probs)
+        wake_terms = [np.outer(probs[i + 1], probs[i]) for i in range(self.nl - 1)]
+        # NOTE: the 1st time this method is called for each batch, it will enter the 'else'
+        # so self.particle will be correctly initialized for the next iterations (enter 'if')
+        if persist:
+            top_prob = self.forward(self.particle)[0][-1]
+            probs_gibbs, samples_gibbs = self.gibbs_sampling(top_prob=top_prob, k=k)
+            self.particle = probs_gibbs[0]
+        else:
+            probs_gibbs, samples_gibbs = self.gibbs_sampling(top_prob=probs[-1], k=k)
+            self.particle = probs_gibbs[0]
+        # compute dream terms
+        dream_terms = [np.outer(probs_gibbs[i + 1], probs_gibbs[i]) for i in range(self.nl - 1)]
+        # compute deltas and return
+        return self.compute_deltas(wake_terms, dream_terms, samples, samples_gibbs)
+
+    def contrastive_divergence(self, v_probs, k):
         # compute wake terms
         probs, samples = self.forward(v_probs)
         wake_terms = [np.outer(probs[i + 1], probs[i]) for i in range(self.nl - 1)]
         # compute dream terms
         probs_gibbs, samples_gibbs = self.gibbs_sampling(top_prob=probs[-1], k=k)
         dream_terms = [np.outer(probs_gibbs[i + 1], probs_gibbs[i]) for i in range(self.nl - 1)]
-        # compute deltas
-        delta_W = [np.subtract(wake_terms[i], dream_terms[i]) for i in range(self.nl - 1)]
-        delta_b = [np.subtract(samples[i], samples_gibbs[i]) for i in range(self.nl)]
-        return delta_W, delta_b
+        # compute deltas and return
+        return self.compute_deltas(wake_terms, dream_terms, samples, samples_gibbs)
 
-    def fit(self, epochs, lr, k, bs=1, save=False, save_path=None, fit_cl=False, save_cl=False, save_cl_path=None):
-        assert epochs > 0 and 0 < lr <= 1 and k > 0
+    def fit(self, alg='cd', epochs=1, lr=0.1, k=1, bs=1, save=False, save_path=None, fit_cl=False, save_cl=False,
+            save_cl_path=None):
+        assert epochs > 0 and 0 < lr <= 1 and k > 0 and alg in ('cd', 'pcd')
         n_imgs = len(self.tr_labels)
         bs = n_imgs if bs == 'batch' or bs > n_imgs else bs
         disable_tqdm = (False, True) if bs < n_imgs else (True, False)  # for progress bars
         indexes = list(range(len(self.tr_imgs)))
+        persist = False
+
         # iterate over epochs
         for ep in range(epochs):
             # shuffle the data
@@ -127,19 +153,24 @@ class DRBN:
                 batch_imgs = self.tr_imgs[start: end]
 
                 # cycle through patterns within a batch
-                for img in tqdm(batch_imgs, disable=disable_tqdm[1]):
-                    dW, db = self.persistent_contrastive_divergence(v_probs=img, k=k)
-                    for i in range(self.nl - 1):
-                        delta_W[i] = np.add(delta_W[i], dW[i])
-                        delta_b[i] = np.add(delta_b[i], db[i])
-                    delta_b[-1] = np.add(delta_b[-1], db[-1])   # update last layer's bias
+                for i, img in tqdm(enumerate(batch_imgs), disable=disable_tqdm[1]):
+                    if alg == 'cd':
+                        dW, db = self.contrastive_divergence(v_probs=img, k=k)
+                    else:
+                        dW, db = self.persistent_contrastive_divergence(v_probs=img, k=k, persist=persist)
+                        persist = True
+                    for j in range(self.nl - 1):
+                        delta_W[j] = np.add(delta_W[j], dW[j])
+                        delta_b[j] = np.add(delta_b[j], db[j])
+                    delta_b[-1] = np.add(delta_b[-1], db[-1])  # update last layer's bias
 
                 # weights update
                 rescaled_lr = lr / bs
                 for i in range(self.nl - 1):
                     self.W_matrs[i] = np.add(self.W_matrs[i], np.multiply(rescaled_lr, delta_W[i]))
                     self.biases[i] = np.add(self.biases[i], np.multiply(rescaled_lr, delta_b[i]))
-                self.biases[-1] = np.add(self.biases[-1], np.multiply(rescaled_lr, delta_b[-1]))    # update last layer's bias
+                self.biases[-1] = np.add(self.biases[-1],
+                                         np.multiply(rescaled_lr, delta_b[-1]))  # update last layer's bias
         if save:
             self.save_model(datetime.now().strftime("rbm_%d-%m-%y_%H-%M") if save_path is None else save_path)
         if fit_cl:
@@ -198,8 +229,9 @@ class DRBN:
         # if a specific set of test images and labels is NOT specified, use the MNIST test set
         if test_images is not None and test_labels is not None:
             assert len(test_images) == len(test_labels)
-        elif not(test_images is None and test_labels is None):
-            raise RuntimeWarning("The number of test images differs from the number of test labels. MNIST test set is going to be used")
+        elif not (test_images is None and test_labels is None):
+            raise RuntimeWarning(
+                "The number of test images differs from the number of test labels. MNIST test set is going to be used")
         if test_images is None:
             test_images = self.ts_imgs
             test_labels = copy.deepcopy(self.ts_labels)
@@ -217,7 +249,8 @@ class DRBN:
         if test_images is not None and test_labels is not None:
             assert len(test_images) == len(test_labels)
         elif not (test_images is None and test_labels is None):
-            raise RuntimeWarning("The number of test images differs from the number of test labels. MNIST test set is going to be used")
+            raise RuntimeWarning(
+                "The number of test images differs from the number of test labels. MNIST test set is going to be used")
         if test_images is None:
             test_images = self.ts_imgs
             test_labels = copy.deepcopy(self.ts_labels)
@@ -282,7 +315,7 @@ class DRBN:
             for i in range(self.nl - 1):
                 weights_shape = np.shape(weights_matrices[i])
                 assert weights_shape[0] == self.units_per_layer[i + 1] and \
-                    weights_shape[1] == len(biases[i]) == self.units_per_layer[i]
+                       weights_shape[1] == len(biases[i]) == self.units_per_layer[i]
                 self.W_matrs[i] = weights_matrices[i]
                 self.biases[i] = biases[i]
             self.biases[-1] = biases[-1]
@@ -292,6 +325,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Implementation of a Deep Restricted Boltzmann Network")
     parser.add_argument('--hl_sizes', action='store', type=int, nargs='+', default=(100,))
     parser.add_argument('--train', action='store_true')
+    parser.add_argument('--alg', action='store', type=str, default='cd', help='Type of algorithm to use {cd, pcd}')
     parser.add_argument('--epochs', action='store', type=int, default=1, help='Number of epochs of training')
     parser.add_argument('--lr', action='store', type=float, default=0.1, help='Learning rate')
     parser.add_argument('--k', action='store', type=int, default=1, help='Learning rate')
