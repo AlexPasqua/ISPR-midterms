@@ -1,0 +1,59 @@
+RBM:
+	size (784, 100):
+		- 1 epoch, 0.1 lr, 1 k, 1 bs		-> loss: 0.2613 - accuracy: 0.9188
+		- 5 epochs, 0.1 lr, 5 k, 1 bs		-> loss: 0.2155 - accuracy: 0.9296
+		- 5 epochs, 0.03 lr, 1 k, 30 bs		-> loss: 0.3000 - accuracy: 0.9035
+		- 5 epochs, 0.03 lr, 5 k, 30 bs		-> loss: 0.2655 - accuracy: 0.9150
+		- 10 epochs, 0.05 lr, 5 k, 1 bs		-> loss: 0.1727 - accuracy: 0.9461
+	
+DRBN:
+	size (784, 100) -> equiv RBM:
+		PCD:
+			- 5 epochs, 0.05 lr, 1 k, 1 bs	-> loss: 0.1801 - accuracy: 0.9448
+			- 20 epochs, 0.05 lr, 1 k, 1 bs	-> loss: 0.1900 - accuracy: 0.9416
+	
+	size (784, 100, 100, 50):
+		CD:
+			- 1 epoch, 0.1 lr, 1 k, 1 bs		-> loss: 2.0250 - accuracy: 0.2089
+			- 5 epochs, 0.03 lr, 1 k, 1 bs		-> loss: 1.8973 - accuracy: 0.2746
+			
+		PCD:
+			- 5 epochs, 0.05 lr, 1 k, 1 bs		-> loss: 2.2702 - accuracy: 0.1327
+			- 20 epochs, 0.0005 lr, 1 k, 1 bs	-> loss: 2.0529 - accuracy: 0.2050
+	
+	size (784, 100, 100, 100):
+		CD:
+			- 10 epochs, 0.1 lr, 1 k, 1 bs		-> loss: 2.2549 - accuracy: 0.1375
+			- 10 epochs, 0.001 lr, 1 k, 1 bs	-> loss: 1.2332 - accuracy: 0.5451
+			- 10 epochs, 0.01 lr, 1 k, 1 bs		-> loss: 1.0886 - accuracy: 0.6331
+			- 20 epochs, 0.001 lr, 1 k, 1 bs	-> loss: 1.0786 - accuracy: 0.6178
+			- 40 epochs, 0.001 lr, 1 k, 1 bs	-> loss: 1.2904 - accuracy: 0.5306
+		PCD:
+			- 20 epochs, 0.0005 lr, 1 k, 1 bs	-> loss: 1.4917 - accuracy: 0.4875
+			- 20 epochs, 0.001 lr, 1 k, 1 bs	-> loss: 1.7946 - accuracy: 0.3229 (overflow)
+			- 20 epochs, 0.00001 lr, 1 k, 1 bs	-> loss: 1.8710 - accuracy: 0.3168
+			- 50 epochs, 0.001 lr, 1 k, 1 bs	-> loss: 2.1030 - accuracy: 0.1988 (overflow)
+			- 50 epochs, 0.00001 lr, 1 k, 1 bs	-> loss: 1.4090 - accuracy: 0.4813
+			- 100 epochs, 0.0001 lr, 1 k, 1 bs	-> loss: 1.3756 - accuracy: 0.4370
+	
+	size (784, 500, 1000):
+		CD:
+			- 1 epoch, 0.0001 lr, 1 k, 1 bs		-> loss: 0.3085 - accuracy: 0.9027
+		PCD:
+			- 1 epoch, 0.0005 lr, 1 k, 1 bs		-> loss: 0.3894 - accuracy: 0.8737
+			- 2 epochs, 0.0001 lr, 1k, 1bs		-> loss: 0.2963 - accuracy: 0.9032
+	
+	size (784, 1000, 500):
+		PCD:
+			- 2 epochs, 0.0001 lr, 1k, 1bs		-> loss: 0.2615 - accuracy: 0.9148
+	
+	size (784, 500, 500, 1000):
+		PCD:
+			- 1 epoch, 0.0001 lr, 1 k, 1 bs		-> loss: 0.5080 - accuracy: 0.8308
+			- 2 epoch, 0.0001 lr, 1 k, 1 bs		-> loss: 0.4461 - accuracy: 0.8540
+	
+	size (784, 1000, 500, 500):
+		PCD:
+			- 1 epoch, 0.0001 lr, 1 k, 1 bs		-> loss: 0.5343 - accuracy: 0.8184
+		
+		

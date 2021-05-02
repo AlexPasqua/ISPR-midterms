@@ -75,7 +75,6 @@ class RBM(DRBN):
         :param h_sample: binary vector of the hidden activations
         :param k: order of the Gibbs sampling
         """
-        # in case it doesn't enter the cycle, but it shouldn't happen
         v_prob, v_sample, h_prob = None, None, None
         for i in range(k):
             v_prob, v_sample = self.pv_h(h_sample)
@@ -117,10 +116,6 @@ class RBM(DRBN):
         :param show_feats: (bool) if True, plot the learnt features (reshaped rows of weights matrix)
         """
         assert epochs > 0 and 0 < lr <= 1 and k > 0
-
-        # uncomment to shorten the training set for debugging purposes
-        # self.tr_imgs, self.tr_labels = self.tr_imgs[:100], self.tr_labels[:100]
-
         # iterate over epochs
         n_imgs = len(self.tr_labels)
         bs = n_imgs if bs == 'batch' or bs > n_imgs else bs
@@ -131,7 +126,6 @@ class RBM(DRBN):
             np.random.shuffle(indexes)
             self.tr_imgs = self.tr_imgs[indexes]
             self.tr_labels = self.tr_labels[indexes]
-
             # cycle through batches
             for batch_idx in tqdm(range(math.ceil(len(self.tr_labels) / bs)), disable=disable_tqdm[0]):
                 delta_W = np.zeros(shape=self.W.shape)
@@ -140,19 +134,16 @@ class RBM(DRBN):
                 start = batch_idx * bs
                 end = start + bs
                 batch_imgs = self.tr_imgs[start: end]
-
                 # cycle through patterns within a batch
                 for img in tqdm(batch_imgs, disable=disable_tqdm[1]):
                     dW, dbv, dbh = self.contrastive_divergence(v_probs=img, k=k)
                     delta_W = np.add(delta_W, dW)
                     delta_bv = np.add(delta_bv, dbv)
                     delta_bh = np.add(delta_bh, dbh)
-
                 # weight update
                 self.W += (lr / bs) * delta_W
                 self.bias_visible += (lr / bs) * delta_bv
                 self.bias_hidden += (lr / bs) * delta_bh
-
         if save:
             self.save_model(datetime.now().strftime("rbm_%d-%m-%y_%H-%M") if save_path is None else save_path)
         if show_feats:
@@ -238,24 +229,38 @@ if __name__ == '__main__':
                 save_cl_path=None,
                 show_feats=False)
     else:
+        # load weights from file
+        rbm.load_weights(args.w_path)
+        # train and test classifier
         rbm.fit_classifier(load_boltz_weights=args.load_w, w_path=args.w_path)
         rbm.test_classifier()
-
-    # rbm.show_encoding(imgs[0])
-    # rbm.show_encoding(imgs[1])
-    # rbm.show_encoding(imgs[2])
-    # rbm.show_encoding(imgs[3])
-    # fig, ax = plt.subplots(2, 2)
-    # ax[0, 0].imshow(np.reshape(imgs[0], newshape=(28, 28)))
-    # ax[0, 1].imshow(np.reshape(imgs[1], newshape=(28, 28)))
-    # ax[1, 0].imshow(np.reshape(imgs[2], newshape=(28, 28)))
-    # ax[1, 1].imshow(np.reshape(imgs[3], newshape=(28, 28)))
-    # fig.show()
-    # rbm.save_model('here.pickle')
-    # rbm.load_weights('models/RBM_weights.pickle')
-    # rbm.fit_classifier(load_boltz_weights=True, w_path='models/RBM_weights.pickle', save=False)
-    # rbm.test_classifier()
-    # rbm.show_reconstruction(imgs[0])
-    # rbm.show_reconstruction(imgs[1])
-    # rbm.show_reconstruction(imgs[2])
-    # rbm.show_reconstruction(imgs[3])
+        # plot confusion matrix
+        rbm.confusion_matrix()
+        # plot a reconstruction for each digit
+        # indexes = []
+        # curr = 0
+        # while curr < 10:
+        #     for i, label in enumerate(rbm.tr_labels):
+        #         if label == curr:
+        #             indexes.append(i)
+        #             curr += 1
+        #             break
+        # fig, ax = plt.subplots(2, 10, figsize=(5, 2))
+        # for i in range(20):
+        #     if i < 10:
+        #         ax[0, i].imshow(np.reshape(rbm.tr_imgs[indexes[i]], newshape=(28, 28)))
+        #         ax[0, i].tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+        #     else:
+        #         v_sample = np.random.binomial(n=1, p=rbm.tr_imgs[indexes[i - 10]], size=len(rbm.tr_imgs[indexes[i - 10]]))
+        #         _, h_sample = rbm.ph_v(v_sample)
+        #         v_probs, _ = rbm.pv_h(h_sample)
+        #         ax[1, i - 10].imshow(np.reshape(v_probs, newshape=(28, 28)))
+        #         ax[1, i - 10].tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+        # fig.suptitle("Original images and their reconstructions")
+        # fig.show()
+        # show reconstructions of specific images
+        # rbm.show_reconstruction(imgs[0])
+        # rbm.show_reconstruction(imgs[1])
+        # rbm.show_reconstruction(imgs[2])
+        # rbm.show_reconstruction(imgs[3])
+        # rbm.show_reconstruction(imgs[4])

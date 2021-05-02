@@ -26,11 +26,3 @@ def sigmoid(x):
     ones = [1.] * len(x)
     return np.divide(ones, np.add(ones, np.exp(-x)))
 
-
-if __name__ == '__main__':
-    tr_imgs, tr_labels, ts_imgs, ts_labels = load_mnist()
-    print('Dimensions: %s x %s' % (tr_imgs.shape[0], tr_imgs.shape[1]))
-
-    # img = np.reshape(train_images[0], newshape=(28, 28))
-    # plt.imshow(img)
-    # plt.show()

@@ -41,7 +41,9 @@ class DRBN:
         self.particle = np.zeros(sizes[0])
         # create classifier
         self.classifier = tf.keras.models.Sequential([
-            Dense(units=50, activation='relu', input_dim=sizes[-1]),
+            Dense(units=200, activation='relu', input_dim=sizes[-1]),
+            Dense(units=100, activation='relu'),
+            Dense(units=50, activation='relu'),
             Dense(units=10, activation='softmax')
         ])
 
@@ -67,8 +69,8 @@ class DRBN:
         samples = np.random.binomial(n=1, p=probs, size=len(probs))
         return probs, samples
 
-    # noinspection PyTypeChecker
     def forward(self, v_probs):
+        """ Compute conditional probability and samples of the hidden layer given the visible one, for each RBM """
         v_sample = np.random.binomial(n=1, p=v_probs, size=len(v_probs))
         probs = [v_probs] + [None] * (self.nl - 1)
         samples = [v_sample] + [None] * (self.nl - 1)
@@ -76,8 +78,8 @@ class DRBN:
             probs[i], samples[i] = self.forward_step(layer_idx=i, prev_sample=samples[i - 1])
         return probs, samples
 
-    # noinspection PyTypeChecker
     def backward(self, top_prob):
+        """ Compute conditional probability and samples of the visible layers given the hidden one, for each RBM """
         top_sample = np.random.binomial(n=1, p=top_prob, size=len(top_prob))
         probs = [None] * (self.nl - 1) + [top_prob]
         samples = [None] * (self.nl - 1) + [top_sample]
@@ -85,8 +87,12 @@ class DRBN:
             probs[i], samples[i] = self.backward_step(layer_idx=i, prev_sample=samples[i + 1])
         return probs, samples
 
-    # noinspection PyTypeChecker
     def gibbs_sampling(self, top_prob, k):
+        """
+        Performs Gibbs sampling
+        :param top_prob: binary vector of the activations of the last RBM's hidden layer
+        :param k: order of the Gibbs sampling
+        """
         samples = None  # in case it doesn't enter the cycle, but it shouldn't happen
         probs = [None] * (self.nl - 1) + [top_prob]
         for i in range(k):
@@ -101,6 +107,12 @@ class DRBN:
         return delta_W, delta_b
 
     def persistent_contrastive_divergence(self, v_probs, k=1, persist=False):
+        """
+        Perform one step of persistent contrastive divergence, with 1 Gibbs chain
+        :param v_probs: vector of the visible units activations (non-binarized)
+        :param k: (int) order of the Gibbs sampling
+        :param persist: (bool) if False, reset the Gibbs sampling chain
+        """
         # compute wake terms
         probs, samples = self.forward(v_probs)
         wake_terms = [np.outer(probs[i + 1], probs[i]) for i in range(self.nl - 1)]
@@ -119,6 +131,11 @@ class DRBN:
         return self.compute_deltas(wake_terms, dream_terms, samples, samples_gibbs)
 
     def contrastive_divergence(self, v_probs, k):
+        """
+        Perform one step of contrastive divergence
+        :param v_probs: vector of the visible units activations (non-binarized)
+        :param k: (int) order of the Gibbs sampling
+        """
         # compute wake terms
         probs, samples = self.forward(v_probs)
         wake_terms = [np.outer(probs[i + 1], probs[i]) for i in range(self.nl - 1)]
@@ -130,20 +147,31 @@ class DRBN:
 
     def fit(self, alg='cd', epochs=1, lr=0.1, k=1, bs=1, save=False, save_path=None, fit_cl=False, save_cl=False,
             save_cl_path=None):
+        """
+        Perform model fitting by contrastive divergence
+        :param alg: (str in {'cd', 'pcd'}) decide whether to use CD or PCD algorithm
+        :param epochs: (int) number of epochs of training
+        :param lr: (float) learning rate (0 < lr <= 1)
+        :param k: (int) order of the Gibbs sampling
+        :param bs: (int) size of a batch/minibatch of training data
+        :param save: (bool) if True, save the model's weights and biases
+        :param save_path: (str) path where to save the model
+        :param fit_cl: (bool) if True, fit the classifier on the encodings
+        :param save_cl: (book) if True, save the classifier's weights
+        :param save_cl_path: (str) path where to save the classifier
+        """
         assert epochs > 0 and 0 < lr <= 1 and k > 0 and alg in ('cd', 'pcd')
         n_imgs = len(self.tr_labels)
         bs = n_imgs if bs == 'batch' or bs > n_imgs else bs
         disable_tqdm = (False, True) if bs < n_imgs else (True, False)  # for progress bars
         indexes = list(range(len(self.tr_imgs)))
-        persist = False
-
         # iterate over epochs
         for ep in range(epochs):
             # shuffle the data
             np.random.shuffle(indexes)
             self.tr_imgs = self.tr_imgs[indexes]
             self.tr_labels = self.tr_labels[indexes]
-
+            persist = False
             # cycle through batches
             for batch_idx in tqdm(range(math.ceil(len(self.tr_labels) / bs)), disable=disable_tqdm[0]):
                 delta_W = [np.zeros(shape=self.W_matrs[i].shape) for i in range(self.nl - 1)]
@@ -151,7 +179,6 @@ class DRBN:
                 start = batch_idx * bs
                 end = start + bs
                 batch_imgs = self.tr_imgs[start: end]
-
                 # cycle through patterns within a batch
                 for i, img in tqdm(enumerate(batch_imgs), disable=disable_tqdm[1]):
                     if alg == 'cd':
@@ -163,7 +190,6 @@ class DRBN:
                         delta_W[j] = np.add(delta_W[j], dW[j])
                         delta_b[j] = np.add(delta_b[j], db[j])
                     delta_b[-1] = np.add(delta_b[-1], db[-1])  # update last layer's bias
-
                 # weights update
                 rescaled_lr = lr / bs
                 for i in range(self.nl - 1):
@@ -172,12 +198,11 @@ class DRBN:
                 self.biases[-1] = np.add(self.biases[-1],
                                          np.multiply(rescaled_lr, delta_b[-1]))  # update last layer's bias
         if save:
-            self.save_model(datetime.now().strftime("rbm_%d-%m-%y_%H-%M") if save_path is None else save_path)
+            self.save_model(datetime.now().strftime("drbn_%d-%m-%y_%H-%M") if save_path is None else save_path)
         if fit_cl:
             self.fit_classifier()
 
     def encode(self, images=None):
-        # create a training set by encoding all the training images
         """
         Creates the encodings for the images to feed the classifier
         :param images: (str or array-like) it specifies what images to encode:
@@ -195,14 +220,14 @@ class DRBN:
 
     def fit_classifier(self, load_boltz_weights=False, w_path=None, save=False, save_path=None):
         """
-        Train the classifier on the embeddings of the RBM
+        Train the classifier on the embeddings of the DRBN
         :param load_boltz_weights: (bool) if True, load the weights of the DRBN from a file
         :param w_path: (str) path where the DRBN's weights are stored
         :param save: (bool) if True, save the classifier's weights
         :param save_path: (str) path where the classifier's weights are stored
         :returns hist: training history
         """
-        # load weights of the RBM from file
+        # load weights of the DRBN from file
         if load_boltz_weights:
             self.load_weights(w_path)
         # create a training set by encoding all the training images
@@ -245,6 +270,11 @@ class DRBN:
         return res
 
     def confusion_matrix(self, test_images=None, test_labels=None):
+        """
+        Plot confusion matrix
+        :param test_images: list of specific images to test the classifier with
+        :param test_labels: list of corresponding labels of test_images
+        """
         # if a specific set of test images and labels is NOT specified, use the MNIST test set
         if test_images is not None and test_labels is not None:
             assert len(test_images) == len(test_labels)
@@ -350,19 +380,37 @@ if __name__ == '__main__':
                  save_cl=False,
                  save_cl_path=None)
     else:
+        # load weights from file
+        drbn.load_weights(args.w_path)
+        # train and test classifier
         drbn.fit_classifier(load_boltz_weights=args.load_w, w_path=args.w_path)
         drbn.test_classifier()
-
-    # drbn.load_weights('models/DRBN_weights.pickle')
-    # drbn.show_reconstruction(img=tr_imgs[0])
-    # drbn.show_reconstruction(img=tr_imgs[1])
-    # drbn.show_reconstruction(img=tr_imgs[2])
-    # drbn.show_reconstruction(img=tr_imgs[3])
-    # drbn.save_model('../models/DRBN_weights.pickle')
-    # new_drbn = DRBN(hl_sizes=(500, 100), v_size=len(tr_imgs[0]), mnist_path='../MNIST/')
-    # new_drbn.load_weights('../models/DRBN_weights.pickle')
-    # new_drbn.fit_classifier()
-    # new_drbn.test_classifier()
-    # new_drbn.show_reconstruction(img=tr_imgs[0])
-    # new_drbn.show_reconstruction(img=tr_imgs[1])
-    # new_drbn.confusion_matrix()
+        # plot confusion matrix
+        drbn.confusion_matrix()
+        # plot a reconstruction for each digit
+        # indexes = []
+        # curr = 0
+        # while curr < 10:
+        #     for i, label in enumerate(drbn.tr_labels):
+        #         if label == curr:
+        #             indexes.append(i)
+        #             curr += 1
+        #             break
+        # fig, ax = plt.subplots(2, 10, figsize=(5, 2))
+        # for i in range(20):
+        #     if i < 10:
+        #         ax[0, i].imshow(np.reshape(drbn.tr_imgs[indexes[i]], newshape=(28, 28)))
+        #         ax[0, i].tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+        #     else:
+        #         v_sample = np.random.binomial(n=1, p=drbn.tr_imgs[indexes[i - 10]], size=len(drbn.tr_imgs[indexes[i - 10]]))
+        #         _, h_sample = drbn.forward(v_sample)
+        #         h_sample = h_sample[-1]
+        #         v_probs, _ = drbn.backward(h_sample)
+        #         v_probs = v_probs[0]
+        #         ax[1, i - 10].imshow(np.reshape(v_probs, newshape=(28, 28)))
+        #         ax[1, i - 10].tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+        # fig.suptitle("Original images and their reconstructions")
+        # fig.show()
+        # show reconstructions of specific images
+        # new_drbn.show_reconstruction(img=tr_imgs[0])
+        # new_drbn.show_reconstruction(img=tr_imgs[1])
