@@ -215,8 +215,8 @@ if __name__ == '__main__':
     parser.add_argument('--w_path', action='store', type=str, help="Path to the RBM's weights")
     args = parser.parse_args()
 
-    imgs, _, _, _ = load_mnist(path="MNIST/")
-    rbm = RBM(n_visible=len(imgs[0]), mnist_path='MNIST/')
+    imgs, _, _, _ = load_mnist(path="../MNIST/")
+    rbm = RBM(n_visible=len(imgs[0]), mnist_path='../MNIST/')
     if args.train:
         rbm.fit(epochs=args.epochs,
                 lr=args.lr,
