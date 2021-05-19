@@ -368,7 +368,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     tr_imgs, tr_labels, ts_imgs, ts_labels = load_mnist()
-    drbn = DRBN(hl_sizes=args.hl_sizes, v_size=len(tr_imgs[0]), mnist_path='../MNIST/')
+    drbn = DRBN(hl_sizes=args.hl_sizes, v_size=len(tr_imgs[0]), mnist_path='../../datasets/MNIST/')
     if args.train:
         drbn.fit(epochs=args.epochs,
                  lr=args.lr,

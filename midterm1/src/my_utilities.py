@@ -16,7 +16,7 @@ def read_data():
     :return: the whole "Appliances" column, the first 3 months of it (as tr_data) and the last 1.5 months (ts_data)
     """
     # read the data and sort it by date
-    whole_data = pd.read_csv("energydata_complete.csv")
+    whole_data = pd.read_csv("../../datasets/energydata_complete.csv")
     whole_data = whole_data[["date", "Appliances"]]
     whole_data["date"] = pd.to_datetime(whole_data["date"])
     whole_data = whole_data.sort_values(by="date")
@@ -122,7 +122,7 @@ def join_files(path):
                 data = {**{"model": fn[:-5]}, **data}
                 results.append(data)
 
-    with open("results/whole_results.json", 'w') as outf:
+    with open("../results/whole_results.json", 'w') as outf:
         json.dump(results, outf, indent='\t')
 
 

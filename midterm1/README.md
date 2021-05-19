@@ -7,5 +7,5 @@ You might also try and experimenting with less "computationally heavy" retrainin
 Try out different configurations of the autoregressive model (e.g. experiment with AR models of order 3, 5 and 7). You can use the autoregressive model of your choice (AR, ARMA, ...) and perform data pre-processing operations, if you wish (not compulsory).<br><br>
 
 #### Implementation:
-- Check [main_notebook.ipynb](main_notebook.ipynb) for the code with explanation.<br>
-- In [my_utilities.py](my_utilities.py) are implemented some auxiliary functions used in the main notebook.
+- Check [main_notebook.ipynb](src/main_notebook.ipynb) for the code with explanation.<br>
+- In [my_utilities.py](src/my_utilities.py) are implemented some auxiliary functions used in the main notebook.

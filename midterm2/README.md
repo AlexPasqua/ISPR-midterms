@@ -9,9 +9,9 @@ The RBM should be implemented fully by you (both CD-1 training and inference ste
 (Alternative to step 3, optional) Step 3 can as well be realized by placing a softmax layer after the RBM: if you are up for it, feel free to solve the assignment this way.
 
 #### Implementation:
-- **Restricted Boltzmann Machine** implemented in [RBM.py](RBM.py)
+- **Restricted Boltzmann Machine** implemented in [RBM.py](src/rbm.py)
 - **Deep Restricted Boltzmann Network** ([reference](https://arxiv.org/pdf/1611.07917.pdf)):
-    - Implemented in [DRBN.py](DRBN.py)
+    - Implemented in [DRBN.py](src/drbn.py)
     - All the layers are trained jointly with (persistent) contrastive divergence ((P)CD)
     - PCD implemented using a single Gibbs sampling chain
 
