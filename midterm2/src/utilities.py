@@ -8,7 +8,7 @@ def load_mnist(path=None):
     :param path: path to the directory containing the MNIST files
     :return: training and test images and labels scaled between 0 and 1
     """
-    path = "MNIST/" if path is None else (path + '/' if path[-1] != '/' else path)
+    path = "../datasets/MNIST/" if path is None else (path + '/' if path[-1] != '/' else path)
     train_images, train_labels = loadlocal_mnist(images_path=path + 'train-images-idx3-ubyte',
                                                  labels_path=path + 'train-labels-idx1-ubyte')
     test_images, test_labels = loadlocal_mnist(images_path=path + 't10k-images-idx3-ubyte',

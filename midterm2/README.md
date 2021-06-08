@@ -9,6 +9,7 @@ The RBM should be implemented fully by you (both CD-1 training and inference ste
 (Alternative to step 3, optional) Step 3 can as well be realized by placing a softmax layer after the RBM: if you are up for it, feel free to solve the assignment this way.
 
 #### Implementation:
+- Download and put [MNIST](http://yann.lecun.com/exdb/mnist/) in [datasets/](../datasets)
 - **Restricted Boltzmann Machine** implemented in [RBM.py](src/rbm.py)
 - **Deep Restricted Boltzmann Network** ([reference](https://arxiv.org/pdf/1611.07917.pdf)):
     - Implemented in [DRBN.py](src/drbn.py)

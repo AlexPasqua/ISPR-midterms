@@ -1,0 +1,3 @@
+[submodule "midterm3/Autoencoders"]
+	path = midterm3/Autoencoders
+	url = https://github.com/AlexPasqua/Autoencoders
