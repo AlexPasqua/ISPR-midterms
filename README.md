@@ -3,3 +3,4 @@
 
 - **[Midterm 1 - Assignment 1 (March 2021): Autoregressive model](midterm1)**
 - **[Midterm 2 - Assignment 3 (April 2021): Restricted Boltzmann Machine](midterm2)**
+- **[Midterm 3 - Assignment 1 (June 2021): Autoencoders](midterm3)**
